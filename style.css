@@ -227,23 +227,55 @@ td button {
         padding: 15px;
     }
 
-    /* Área de Filtros de Data */
+   /* Muda de Grid (lado a lado) para Flex Column (um em cima do outro) */
     #area-filtros-data {
+        display: flex !important;
+        flex-direction: column;
+        gap: 12px; /* Espaço entre os campos */
         width: 100%;
-        display: grid !important; /* Força grid para organizar melhor */
-        grid-template-columns: 1fr 1fr auto; /* Início | Fim | Botão */
-        gap: 10px;
-    }
-    
-    #area-filtros-data div {
-        width: 100%;
-    }
-    
-    #area-filtros-data input[type="date"] {
-        width: 100%;
-        font-size: 0.8rem;
+        background: transparent; /* Remove fundos estranhos se houver */
     }
 
+    /* Garante que cada bloco (Início / Fim) ocupe a largura total */
+    #area-filtros-data div {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 5px; /* Espacinho entre a label "Início" e o input */
+    }
+
+    /* Ajuste visual do Input de Data para parecer um botão grande e bonito */
+    #area-filtros-data input[type="date"] {
+        width: 100%;
+        padding: 14px; /* Mais gordinho para o dedo */
+        font-size: 1rem;
+        border-radius: 10px;
+        /* Garante que a cor respeite o seu tema (Dark/Light) */
+        background-color: var(--bg-card); 
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+        /* Remove aparência padrão "feia" do iOS/Safari */
+        -webkit-appearance: none;
+        appearance: none;
+        min-height: 50px; /* Altura mínima garantida */
+    }
+
+    /* O botão de filtrar vira uma barra larga abaixo das datas */
+    #area-filtros-data button {
+        width: 100%;
+        padding: 14px;
+        margin-top: 5px;
+        font-size: 1rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    /* Adiciona texto ao botão no celular para ficar mais claro */
+    #area-filtros-data button::after {
+        content: " Filtrar Datas";
+        margin-left: 8px;
+    }
     /* Cards de KPI (Faturamento, Lucro) - Um por linha */
     .kpi-grid {
         grid-template-columns: 1fr;
