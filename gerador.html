@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerador 1 - Estoque Nutriforte</title>
+    <style>body{font-family:sans-serif;background:#f0f9ff;text-align:center;padding:50px}button{padding:20px;font-size:1.2rem;background:#0284c7;color:white;border:none;border-radius:10px;cursor:pointer}</style>
+</head>
+<body>
+    <h1>Passo 1: Gerar Estoque</h1>
+    <p>Clique abaixo para baixar o arquivo com mais de 600 produtos.</p>
+    <button onclick="baixar()">Baixar Backup Estoque (.json)</button>
+    <script>
+    // DADOS DO PDF "BASE DE DADOS" [cite: 115-136]
+    const RAW_DATA = [
+        // GERAL
+        ["GERAL","GUABI",54,65],["GERAL","CAROÇO DE ALGODÃO",486,112],["GERAL","FARELO SOJA 1/2",80,112],
+        ["GERAL","FARELO SOJA A GRANEL",2.5,3.5],["GERAL","FARELO SOJA CARGIL",1375,145],["GERAL","FARELO TRIGO",810,55],
+        ["GERAL","FARELO TRIGO 1/2",21,25],["GERAL","FARELO TRIGO A GRANEL",1.4,2],["GERAL","MILHO GRÃO",66,78],
+        ["GERAL","MILHO GRÃO 1/2",33,35],["GERAL","MILHO GRÃO A GRANEL",1.44,2],["GERAL","MILHO MOIDO",68,80],
+        ["GERAL","MILHO MOIDO 1/2",34,40],["GERAL","MILHO MOIDO A GRANEL",1.48,2],["GERAL","RAÇÃO SUINOS 1/2",46.3,64.82],
+        ["GERAL","RAÇÃO SUINOS 50KG",92.6,130],["GERAL","RAÇÃO VACA DE LEITE 50KG",98.45,125],["GERAL","SAL COMUM",15,18],
+        ["GERAL","TORTA DE ALGODÃO",85,95],["GERAL","TORTA DE ALGODÃO A GRANEL",2.1,3],["GERAL","SILAGEM",20,25],
+        // RAÇÕES
+        ["RAÇÕES","EQUITAGE 15 LAMINADOS",135,162],["RAÇÕES","EQUITAGE FIBRA 40KG",154.88,216.83],["RAÇÕES","EQUITAGEMIX",129,154.8],
+        ["RAÇÕES","EQUITURBO",103.25,144.55],["RAÇÕES","GUABI BEEF MIX 85",138.49,180.04],["RAÇÕES","GUABI LACTAGE GOLD",134,174.2],
+        ["RAÇÕES","GUABI NUCLEO FRANGOS",166.89,225.4],["RAÇÕES","GUABI NUCLEO LEITÃO",214,246.1],["RAÇÕES","GUABI NUCLEO SUINOS",140,196],
+        ["RAÇÕES","GUABIPHOS 30 SECAS",86,120],["RAÇÕES","GUABIPHOS 40 ENGORDA",99,138.6],["RAÇÕES","GUABIPHOS 80 LEITE",142,198.8],
+        ["RAÇÕES","GUABIPHOS 90 REPRODUÇÃO",156,180],["RAÇÕES","GUABITECH CARE 30KG",138.79,194.31],["RAÇÕES","GUABITECH ENERGY PRO 20",190.27,255],
+        ["RAÇÕES","NUTRIEQUI",103,123.6],["RAÇÕES","PROEQUI 13 LAMINADOS",110,137.5],["RAÇÕES","PROEQUI 15 MELAÇADA",112,140],
+        ["RAÇÕES","RAÇÃO BOTADEIRA 5 KG",18.54,25.96],["RAÇÕES","RAÇÃO FRANGOS 5 KG",18.34,25.68],["RAÇÕES","RAÇÃO INICIAL 5 KG",22.65,31.71],
+        ["RAÇÕES","RAÇÃO PRE INICIAL 5 KG",25.5,35.7],["RAÇÕES","SUPRIPASTO 12 RC 30KG",78.1,109.34],["RAÇÕES","RAÇÃO COMIGO COOPERHORSE",50.42,60.5],
+        ["RAÇÕES","RAÇÃO COMIGO PORKAO",53.5,65.81],["RAÇÕES","RAÇÃO COMIGO COOPER BULL",39.4,49.64],["RAÇÕES","RAÇÃO COMIΡΕΙΧΕ 4MM",74.8,97.24],
+        ["RAÇÕES","RAÇÃO FRANGOS 20 KG",78.65,110.11],["RAÇÕES","GUABITECH ENERGY PRO 20 A GRANEL",6.93,10],
+        // PET
+        ["PET","BILLY CAT 25KG",190,266],["PET","BILLY DOG ADULTO 25KG",137,191.8],["PET","BILLY DOG FILHOTE 25KG",166,232.4],
+        ["PET","BOBBY 25KG",87.9,109],["PET","BOBBY JUNIOR 10KG",51,81.6],["PET","COLEIRA CAO G",5.62,9.56],
+        ["PET","GOLDEN ADULTO 15KG",147.45,206.43],["PET","KIKO CAT 25KG",165.9,232.26],["PET","PEDIGREE ADULTO 20KG",207.76,290.86],
+        ["PET","PREMIER ADULTO RAÇA PEQ",282,394.8],["PET","SHAMPOO SANOL DOG",14.87,23.79],["PET","VITAPOP 25KG",81,100.44],
+        ["PET","WHISKAS SACHE CARNE",2.33,3],["PET","WHISKAS SACHE FRANGO",2.33,3],["PET","BILLY DOG 1KG ADULTO",11,17.6],
+        ["PET","BILLY DOG ADULTO FRANGO",140,180],["PET","BRINQUEDO BOLA PETISQUEIRA",14.94,25.4],["PET","COLEIRA PATINHA GUIZO",4.51,7.22],
+        ["PET","COMEDOURO PLASTICO ERGONOMICO",8.2,13.94],["PET","GOLDEN FILHOTES FRANGO 20 KG",200.88,281.23],["PET","GRANULADO DE MADEIRA 4KG",18.39,31.26],
+        ["PET","N&D TROP FILHOTE MINI SUINO 2,5KG",99.62,159.39],["PET","N&D TROP SELEC CAN ADT MINI FRANGO 12KG",244.54,391.26],
+        ["PET","PASTEL 25KG",110,176],["PET","VITTA NATURAL ADULTO CARNE 15KG",123.63,173.08],["PET","WHISKAS ADULTO CARNE 10,1KG",133.25,185],
+        // MEDICAMENTOS (Lista completa extraída)
+        ["MEDICAMENTO","ACURA MAX 25ML",44.77,71.63],["MEDICAMENTO","ADE EM PO 1KG",9.99,15.98],["MEDICAMENTO","AGULHA BD ROSA",0.3,0.48],
+        ["MEDICAMENTO","ALIV-V INJ 50ML",29.96,47.94],["MEDICAMENTO","BANAMINE",40,64],["MEDICAMENTO","BARRAGE 20 ML",3.3,5.28],
+        ["MEDICAMENTO","CALMINEX 100GRS",31.6,50.56],["MEDICAMENTO","CHEMITRIL ORAL",24.32,38.91],["MEDICAMENTO","CIPERMETRINA POUR ON",24.6,39.36],
+        ["MEDICAMENTO","DECTOMAX 50ML",25,40],["MEDICAMENTO","DORAX PASTA",22.38,35.81],["MEDICAMENTO","DUPRANTEL",1,1.6],
+        ["MEDICAMENTO","ENRONEW 50MG",5.83,9.32],["MEDICAMENTO","EQUIPALAZONE INJ",41.99,67.18],["MEDICAMENTO","FLUMAX 50ML",38.99,62.38],
+        ["MEDICAMENTO","FORMIKELL GEL",12.5,20],["MEDICAMENTO","IVOMEC GOLD 50ML",45,72],["MEDICAMENTO","KELLDRIN MATT PULGAS",2.13,3.84],
+        ["MEDICAMENTO","MONOVIN A 20 ML",27.76,44.42],["MEDICAMENTO","NEXGARD SPECTRA 2-3.5KG",59.14,94.63],["MEDICAMENTO","ORGANOVIT 100ML",9.91,15.88],
+        ["MEDICAMENTO","POTENAY",10,16],["MEDICAMENTO","PROVERME 28GRS",6.02,9.63],["MEDICAMENTO","TERRAMICINA LA 50ML",19.47,31.15],
+        ["MEDICAMENTO","TIURAN AEROSSOL",28.92,46.27],["MEDICAMENTO","AMINOMIX PET 100GRS",34.96,55.94],["MEDICAMENTO","AMITRAZ CALBOS",4.11,6.58],
+        ["MEDICAMENTO","ANTITOXICO BIOFARM 100ML",18.04,28.86],["MEDICAMENTO","AVEREX 30 GRS",7.06,11.3],["MEDICAMENTO","AZIUM",16.84,26.94],
+        ["MEDICAMENTO","BENZOCRIOL 500ML",21.04,33.66],["MEDICAMENTO","BIODEX 20 COMPRIMIDOS",11.88,19.01],["MEDICAMENTO","BORGAL 50ML",60.73,85.02],
+        ["MEDICAMENTO","CEF-50 INJ 100ML",49.99,79.98],["MEDICAMENTO","CREOLINA 50ML",10.33,16.53],["MEDICAMENTO","KELLDRIN KELLMAT BLOCO",1.18,2.12],
+        ["MEDICAMENTO","KELLDRIN KELLTHION 1L",58.78,105.8],["MEDICAMENTO","WELLPET 100MG 4-10KG",43.46,69.54],
+        // SELARIA (Lista completa extraída)
+        ["SELARIA","ADUBO DIMY 500G",6.83,11.62],["SELARIA","ARAME FARPADO 500M",352,457.6],["SELARIA","BOTA PLUMA",87.9,158.22],
+        ["SELARIA","BOTA SOLADO PNEU",49.9,94.81],["SELARIA","CANIVETE COMUM",21,33.6],["SELARIA","CHAPEU COURO ABA G",60,96],
+        ["SELARIA","CORDA 10MM",1.29,2.06],["SELARIA","ENXADA TRAMONTINA",23.67,37.87],["SELARIA","FACÃO CORNETA",69,99],
+        ["SELARIA","MACHADO TRAMONTINA",47.34,75.74],["SELARIA","PULVERIZADOR 20L",263.22,368.51],["SELARIA","BAYGON ESPIRAL C/10",5.6,9.52],
+        ["SELARIA","COMEDOURO AVES 1 FURO",2.03,3.25],["SELARIA","CORDA TRANÇADA PP 4MM",0.4,0.8],["SELARIA","RAÇÃO CANÁRIO 500G",4.56,7.3]
+    ];
+
+    function baixar() {
+        const backup = { produtos: [], categorias: [] };
+        const cats = new Set();
+        RAW_DATA.forEach(p => {
+            cats.add(p[0]);
+            backup.produtos.push({
+                nome: p[1], categoria: p[0], custo: p[2], venda: p[3], 
+                qtd: 0, ativo: true, criadoEm: new Date().toISOString()
+            });
+        });
+        cats.forEach(c => backup.categorias.push({ nome: c }));
+        const blob = new Blob([JSON.stringify(backup, null, 2)], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "backup_estoque.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+    </script>
+</body>
+</html>
