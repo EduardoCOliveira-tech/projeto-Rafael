@@ -170,3 +170,138 @@ td button {
     margin-right: 5px;
     vertical-align: middle;
 }
+
+/* =========================================
+   RESPONSIVIDADE MOBILE (Adicionar ao final do CSS)
+   ========================================= */
+
+@media (max-width: 768px) {
+    
+    /* Ajuste Geral do Layout */
+    body {
+        font-size: 14px; /* Fonte levemente menor para caber mais coisas */
+    }
+
+    /* O Sidebar agora flutua por cima do conteúdo em vez de empurrar */
+    .sidebar {
+        position: fixed;
+        height: 100vh;
+        z-index: 1000;
+        transition: transform 0.3s ease;
+        box-shadow: 4px 0 15px rgba(0,0,0,0.2);
+    }
+
+    /* Estado "Aberto" no Mobile */
+    .sidebar:not(.collapsed) {
+        width: 80%; /* Ocupa 80% da tela */
+        max-width: 300px;
+    }
+
+    /* Estado "Fechado" no Mobile (Fica apenas a faixinha dos ícones) */
+    .sidebar.collapsed {
+        width: 60px;
+        transform: translateX(0); /* Mantém visível */
+    }
+
+    /* Ajuste do cabeçalho da sidebar para caber na versão fechada */
+    .sidebar.collapsed .sidebar-header {
+        padding: 5px;
+    }
+    .sidebar.collapsed .logo-sidebar {
+        width: 40px;
+        margin-bottom: 10px;
+    }
+
+    /* Conteúdo Principal */
+    .content {
+        /* Deixa um espaço na esquerda para a barra fechada não tapar o texto */
+        padding: 15px 15px 15px 75px; 
+        width: 100%;
+    }
+
+    /* Top Bar (Barra de datas e tema) */
+    .top-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+        padding: 15px;
+    }
+
+    /* Área de Filtros de Data */
+    #area-filtros-data {
+        width: 100%;
+        display: grid !important; /* Força grid para organizar melhor */
+        grid-template-columns: 1fr 1fr auto; /* Início | Fim | Botão */
+        gap: 10px;
+    }
+    
+    #area-filtros-data div {
+        width: 100%;
+    }
+    
+    #area-filtros-data input[type="date"] {
+        width: 100%;
+        font-size: 0.8rem;
+    }
+
+    /* Cards de KPI (Faturamento, Lucro) - Um por linha */
+    .kpi-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    /* Gráfico */
+    .chart-container {
+        height: 300px; /* Altura menor no celular */
+        padding: 15px;
+    }
+
+    /* Formulários */
+    .form-row {
+        flex-direction: column; /* Empilha os inputs verticalmente */
+        gap: 15px;
+    }
+
+    .form-group {
+        width: 100%;
+        min-width: auto;
+    }
+
+    input, select {
+        padding: 12px; /* Área de toque maior */
+        font-size: 16px; /* Evita zoom automático no iPhone */
+    }
+
+    /* Tabelas */
+    .table-responsive {
+        border: 1px solid var(--border-color);
+        margin-top: 10px;
+    }
+    
+    th, td {
+        white-space: nowrap; /* Evita quebra de linha feia na tabela */
+        padding: 10px;
+        font-size: 0.85rem;
+    }
+
+    /* Botões na tabela */
+    td button.btn-icon {
+        padding: 8px 12px;
+        background: #f1f5f9;
+        border-radius: 5px;
+        margin-right: 5px;
+    }
+
+    /* Modais (Janelas flutuantes) */
+    .modal-box {
+        width: 95%; /* Quase a largura toda */
+        padding: 20px;
+        max-height: 90vh; /* Se for muito alto, permite rolar */
+    }
+    
+    /* Login Screen */
+    .login-box {
+        width: 90%;
+        padding: 30px 20px;
+    }
+}
