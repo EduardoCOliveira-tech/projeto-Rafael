@@ -9,6 +9,48 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="logo.jpeg">
+    <style>
+        /* CSS CRÍTICO PARA OS MODAIS E TABELAS */
+        .hidden { display: none !important; }
+        
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5); z-index: 2000;
+            display: flex; justify-content: center; align-items: center;
+            backdrop-filter: blur(3px);
+        }
+        .modal-box {
+            background: white; padding: 25px; border-radius: 12px;
+            width: 90%; max-width: 500px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        .custom-icon { font-size: 3rem; margin-bottom: 15px; display: block; text-align: center; }
+        .icon-success { color: #22c55e; }
+        .icon-error { color: #ef4444; }
+        .icon-warning { color: #f59e0b; }
+        .icon-info { color: #3b82f6; }
+        
+        /* Tabelas */
+        th.sortable { cursor: pointer; user-select: none; transition: 0.2s; }
+        th.sortable:hover { background-color: #e2e8f0; color: #1e293b; }
+        th.sortable i { margin-left: 5px; font-size: 0.8em; color: #94a3b8; }
+        
+        /* Carrinho */
+        #tabela-carrinho { margin: 15px 0; border: 1px solid #e2e8f0; width: 100%; border-collapse: collapse; }
+        #tabela-carrinho th { background: #f8fafc; padding: 10px; font-size: 0.85rem; text-align: left; }
+        #tabela-carrinho td { padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+        
+        /* Rodapé Tabela Estoque */
+        tfoot tr { background-color: #f1f5f9; font-weight: bold; border-top: 2px solid #cbd5e1; }
+        tfoot td { padding: 12px; font-size: 1rem; color: #0f172a; }
+        
+        /* Tema Escuro - Ajustes Modais */
+        body.dark-mode .modal-box { background: #1e293b; color: #f1f5f9; }
+        body.dark-mode th.sortable:hover { background-color: #334155; color: white; }
+    </style>
 </head>
 <body>
     <div id="login-screen">
@@ -31,11 +73,8 @@
                     <img src="logo.jpeg" alt="Logo" class="logo-sidebar">
                     <small id="user-email-display">usuario@loja.com</small>
                 </div>
-                <button id="sidebar-toggle" class="btn-icon" title="Recolher Menu">
-                    <i class="fas fa-bars"></i>
-                </button>
+                <button id="sidebar-toggle" class="btn-icon"><i class="fas fa-bars"></i></button>
             </div>
-
             <ul class="menu">
                 <li class="active" data-target="dashboard"><i class="fas fa-chart-line"></i> <span>Dashboard</span></li>
                 <li data-target="vendas"><i class="fas fa-cash-register"></i> <span>Nova Venda</span></li>
@@ -45,12 +84,11 @@
                 <li data-target="estoque"><i class="fas fa-boxes"></i> <span>Estoque</span></li>
                 <li data-target="devedores"><i class="fas fa-users"></i> <span>Devedores</span></li>
             </ul>
-            
             <div class="sidebar-footer">
-                <button onclick="document.getElementById('modal-backup').classList.remove('hidden')" class="btn-primary" style="width: 100%; background: #e67e22; font-size: 0.8rem; margin-bottom: 10px;" title="Backup">
+                <button onclick="document.getElementById('modal-backup').classList.remove('hidden')" class="btn-primary" style="width: 100%; background: #e67e22; font-size: 0.8rem; margin-bottom: 10px;">
                     <i class="fas fa-sync-alt"></i> <span>Backup</span>
                 </button>
-                <button id="btn-logout" style="width: 100%" title="Sair"><i class="fas fa-sign-out-alt"></i> <span>Sair</span></button>
+                <button id="btn-logout" style="width: 100%"><i class="fas fa-sign-out-alt"></i> <span>Sair</span></button>
             </div>
         </nav>
 
@@ -65,11 +103,12 @@
                         <button onclick="window.filtrarPorData()" class="btn-primary" style="padding: 8px;"><i class="fas fa-filter"></i></button>
                     </div>
                     <div id="filtro-mes-gastos" class="hidden">
-                        <label style="font-size: 0.8rem;">Mês de Referência:</label>
+                        <label style="font-size: 0.8rem;">Mês:</label>
                         <input type="month" id="mes-gastos" onchange="window.carregarGastos()">
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 15px; margin-left: auto;">
+                    <button onclick="window.verificarEstoqueBaixo(true)" class="btn-icon" title="Ver Estoque Baixo" style="color:#ef4444"><i class="fas fa-exclamation-triangle"></i></button>
                     <span id="loading-indicator" class="hidden"><i class="fas fa-spinner fa-spin"></i></span>
                     <button id="theme-toggle" class="btn-primary" style="padding: 10px 15px;"><i class="fas fa-moon"></i></button>
                 </div>
@@ -82,107 +121,74 @@
                     <div class="card kpi success"><h3>Lucro Líquido</h3><span id="kpi-lucro">R$ 0,00</span></div>
                     <div class="card kpi warning"><h3>Fiado Pendente</h3><span id="kpi-fiado">R$ 0,00</span></div>
                 </div>
+                <div style="text-align: right; margin: 10px 0;">
+                    <button onclick="window.abrirRelatorioMensal()" class="btn-primary" style="background: #8b5cf6;"><i class="fas fa-chart-pie"></i> Relatório Top Vendas</button>
+                </div>
                 <div class="form-row">
-                    <div class="card chart-container" style="flex:1">
-                        <div class="chart-header"><h3>Vendas x Custos</h3></div>
-                        <div class="canvas-wrapper"><canvas id="mainChart"></canvas></div>
-                    </div>
-                    <div class="card chart-container" style="flex:1">
-                        <div class="chart-header"><h3>Evolução Diária (Vendas)</h3></div>
-                        <div class="canvas-wrapper"><canvas id="dailyChart"></canvas></div>
-                    </div>
+                    <div class="card chart-container" style="flex:1"><div class="chart-header"><h3>Vendas x Custos</h3></div><div class="canvas-wrapper"><canvas id="mainChart"></canvas></div></div>
+                    <div class="card chart-container" style="flex:1"><div class="chart-header"><h3>Evolução Diária</h3></div><div class="canvas-wrapper"><canvas id="dailyChart"></canvas></div></div>
                 </div>
             </section>
 
             <section id="vendas" class="view">
-                <h2>Registrar Venda</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2>Nova Venda (Carrinho)</h2>
+                    <button onclick="window.abrirModalMetodos()" class="btn-primary" style="font-size:0.8rem; background: #0ea5e9;">
+                        <i class="fas fa-credit-card"></i> Gerenciar Pagamentos
+                    </button>
+                </div>
+
                 <div class="card form-container">
-                    <form id="form-venda">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;"><label>Produto</label><input list="list-produtos-venda" id="venda-produto" placeholder="Buscar..." autocomplete="off"><datalist id="list-produtos-venda"></datalist></div>
+                        <div class="form-group"><label>Qtd.</label><input type="text" id="venda-qtd" value="1" placeholder="Ex: 1,5"></div>
+                        <div class="form-group"><label>Preço Unit.</label><input type="number" id="venda-valor-unit" step="0.01"></div>
+                        <div class="form-group" style="align-self: flex-end;"><button onclick="window.adicionarAoCarrinho()" class="btn-primary" style="width:100%">+ Adicionar</button></div>
+                    </div>
+                    
+                    <div style="max-height: 200px; overflow-y: auto; margin: 15px 0;">
+                        <table id="tabela-carrinho">
+                            <thead><tr><th>Produto</th><th>Qtd</th><th>Unit</th><th>Total</th><th>Remover</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+
+                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
                         <div class="form-row">
-                            <div class="form-group"><label>Data da Venda</label><input type="date" id="venda-data" required></div>
-                            <div class="form-group" style="flex: 2;">
-                                <label>Produto</label>
-                                <input list="list-produtos-venda" id="venda-produto" placeholder="Buscar..." required autocomplete="off">
-                                <datalist id="list-produtos-venda"></datalist>
-                            </div>
-                            <div class="form-group"><label>Qtd.</label><input type="number" id="venda-qtd" value="1" min="1" required></div>
+                            <div class="form-group" style="flex: 2;"><label>Cliente</label><input list="list-clientes-venda" id="venda-cliente" placeholder="Buscar..." value="Consumidor Final"><datalist id="list-clientes-venda"></datalist></div>
+                            <div class="form-group"><label>Pagamento</label><select id="venda-metodo"></select></div>
+                            <div class="form-group"><label>Data da Venda</label><input type="date" id="venda-data"></div>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group"><label>Unitário</label><input type="text" id="venda-valor-unit" disabled style="background:#e2e8f0"></div>
-                            <div class="form-group"><label>Total</label><input type="number" id="venda-valor-total" step="0.01" required style="font-weight:bold; color:var(--primary)"></div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                            <h2 style="color: var(--primary);">Total: <span id="venda-total-carrinho">R$ 0,00</span></h2>
+                            <button onclick="window.finalizarVendaCarrinho()" class="btn-success" style="padding: 12px 30px; font-size: 1.1rem;">✅ Finalizar Venda</button>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group" style="flex: 2;">
-                                <label>Cliente</label>
-                                <input list="list-clientes-venda" id="venda-cliente" placeholder="Buscar..." required autocomplete="off" value="Consumidor Final">
-                                <datalist id="list-clientes-venda"></datalist>
-                            </div>
-                            <div class="form-group">
-                                <label>Pagamento</label>
-                                <select id="venda-metodo">
-                                    <option value="dinheiro">Dinheiro</option><option value="pix">Pix</option>
-                                    <option value="debito">Débito</option><option value="credito">Crédito</option>
-                                    <option value="aver">A Ver (Fiado)</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn-success" style="margin-top:10px">Confirmar Venda</button>
-                    </form>
+                    </div>
                 </div>
             </section>
 
             <section id="gastos" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h2>Controle de Gastos</h2>
-                    <div id="bulk-actions-gastos" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;">
-                        <button onclick="window.excluirMassaGastos()" class="btn-icon" style="color: #dc2626; font-weight: bold;">Apagar Selecionados</button>
-                    </div>
+                    <div id="bulk-actions-gastos" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;"><button onclick="window.excluirMassaGastos()" class="btn-icon" style="color: #dc2626;">Apagar Selecionados</button></div>
                     <button onclick="window.abrirModalBancos()" class="btn-primary" style="font-size:0.8rem"><i class="fas fa-university"></i> Gerenciar Bancos</button>
                 </div>
-
                 <div class="kpi-grid" style="margin-top: 15px;">
-                    <div class="card chart-container" style="height: 250px;">
-                        <div class="chart-header"><h4>Status (Pago vs Pendente)</h4></div>
-                        <div class="canvas-wrapper"><canvas id="chartGastoStatus"></canvas></div>
-                    </div>
-                    <div class="card chart-container" style="height: 250px;">
-                        <div class="chart-header"><h4>Por Método</h4></div>
-                        <div class="canvas-wrapper"><canvas id="chartGastoMetodo"></canvas></div>
-                    </div>
-                    <div class="card chart-container" style="height: 250px;">
-                        <div class="chart-header"><h4>Evolução</h4></div>
-                        <div class="canvas-wrapper"><canvas id="chartGastoEvolucao"></canvas></div>
-                    </div>
+                    <div class="card chart-container" style="height: 250px;"><div class="canvas-wrapper"><canvas id="chartGastoStatus"></canvas></div></div>
+                    <div class="card chart-container" style="height: 250px;"><div class="canvas-wrapper"><canvas id="chartGastoMetodo"></canvas></div></div>
+                    <div class="card chart-container" style="height: 250px;"><div class="canvas-wrapper"><canvas id="chartGastoEvolucao"></canvas></div></div>
                 </div>
-
                 <div class="card form-container" style="margin-top: 20px;">
                     <form id="form-gasto">
-                        <div class="form-row">
-                            <div class="form-group" style="flex:2"><label>Descrição</label><input type="text" id="gasto-nome" required placeholder="Ex: Conta de Luz"></div>
-                            <div class="form-group"><label>Valor (R$)</label><input type="number" id="gasto-valor" step="0.01" required></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label>Data Entrada</label><input type="date" id="gasto-data-entrada" required></div>
-                            <div class="form-group"><label>Vencimento</label><input type="date" id="gasto-data-vencimento" required></div>
-                            <div class="form-group">
-                                <label>Status</label>
-                                <select id="gasto-status" onchange="window.toggleCamposPagamento('gasto-status', 'container-pagamento-novo')">
-                                    <option value="pendente" selected>Pendente</option>
-                                    <option value="pago">Pago</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="container-pagamento-novo" class="form-row hidden" style="background: #f0fdf4; padding: 10px; border-radius: 8px; border: 1px solid #bbf7d0;">
-                            <div class="form-group"><label>Método</label><select id="gasto-metodo"><option value="dinheiro">Dinheiro</option><option value="pix">Pix</option><option value="boleto">Boleto</option><option value="cartao">Cartão</option></select></div>
-                            <div class="form-group"><label>Banco</label><select id="gasto-banco"><option value="">Selecione...</option></select></div>
-                        </div>
+                        <div class="form-row"><div class="form-group" style="flex:2"><label>Descrição</label><input type="text" id="gasto-nome" required></div><div class="form-group"><label>Valor (R$)</label><input type="number" id="gasto-valor" step="0.01" required></div></div>
+                        <div class="form-row"><div class="form-group"><label>Data Entrada</label><input type="date" id="gasto-data-entrada" required></div><div class="form-group"><label>Vencimento</label><input type="date" id="gasto-data-vencimento" required></div><div class="form-group"><label>Status</label><select id="gasto-status" onchange="window.toggleCamposPagamento('gasto-status', 'container-pagamento-novo')"><option value="pendente">Pendente</option><option value="pago">Pago</option></select></div></div>
+                        <div id="container-pagamento-novo" class="form-row hidden" style="background: #f0fdf4; padding: 10px; border-radius: 8px;"><div class="form-group"><label>Método</label><select id="gasto-metodo"></select></div><div class="form-group"><label>Banco</label><select id="gasto-banco"><option value="">Selecione...</option></select></div></div>
                         <button type="submit" class="btn-primary" style="width:100%; margin-top: 10px;">Registrar Gasto</button>
                     </form>
                 </div>
-
                 <div class="table-responsive">
                     <table id="tabela-gastos">
-                        <thead><tr><th style="width:30px"><input type="checkbox" id="select-all-gastos"></th><th>Data</th><th>Descrição</th><th>Banco</th><th>Método</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead>
+                        <thead><tr><th style="width:30px"><input type="checkbox" id="select-all-gastos"></th><th class="sortable" onclick="window.ordenarTabela('gastos', 'dataEntrada')">Data <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('gastos', 'nome')">Descrição <i class="fas fa-sort"></i></th><th>Banco</th><th>Método</th><th>Vencimento</th><th class="sortable" onclick="window.ordenarTabela('gastos', 'valor')">Valor <i class="fas fa-sort"></i></th><th>Status</th><th>Ação</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -190,170 +196,87 @@
 
             <section id="clientes" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2>Meus Clientes</h2>
-                    <div id="bulk-actions-clientes" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;">
-                        <button onclick="window.excluirMassaClientes()" class="btn-icon" style="color: #dc2626; font-weight: bold;">Apagar Selecionados</button>
-                    </div>
+                    <h2>Clientes</h2>
+                    <div id="bulk-actions-clientes" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;"><button onclick="window.excluirMassaClientes()" class="btn-icon" style="color: #dc2626;">Apagar Selecionados</button></div>
                 </div>
-                <div class="card form-container" style="padding: 15px;">
+                <div class="card form-container">
                     <form id="form-cliente">
-                        <div class="form-row">
-                            <div class="form-group" style="flex:2"><label>Nome Completo</label><input type="text" id="cli-nome" required></div>
-                            <div class="form-group"><label>Telefone</label><input type="text" id="cli-tel"></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label>CPF</label><input type="text" id="cli-cpf"></div>
-                            <div class="form-group" style="flex:2"><label>Endereço Completo</label><input type="text" id="cli-endereco"></div>
-                        </div>
+                        <div class="form-row"><div class="form-group" style="flex:2"><label>Nome</label><input type="text" id="cli-nome" required></div><div class="form-group"><label>Tel</label><input type="text" id="cli-tel"></div></div>
+                        <div class="form-row"><div class="form-group"><label>CPF</label><input type="text" id="cli-cpf"></div><div class="form-group" style="flex:2"><label>Endereço</label><input type="text" id="cli-endereco"></div></div>
                         <button type="submit" class="btn-primary">Salvar Cliente</button>
                     </form>
                 </div>
-                <div style="margin-bottom: 10px;"><input type="text" id="busca-clientes" placeholder="🔍 Pesquisar cliente..." onkeyup="window.filtrarClientes()" style="padding: 10px; width: 100%;"></div>
-                <div class="table-responsive"><table id="tabela-clientes"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-cli"></th><th>Nome</th><th>Telefone</th><th>CPF</th><th>Ação</th></tr></thead><tbody></tbody></table></div>
+                <div style="margin-bottom: 10px;"><input type="text" id="busca-clientes" placeholder="🔍 Pesquisar..." onkeyup="window.filtrarClientes()" style="padding: 10px; width: 100%;"></div>
+                <div class="table-responsive"><table id="tabela-clientes"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-cli"></th><th class="sortable" onclick="window.ordenarTabela('clientes', 'nome')">Nome <i class="fas fa-sort"></i></th><th>Telefone</th><th>CPF</th><th>Ação</th></tr></thead><tbody></tbody></table></div>
             </section>
 
             <section id="historico" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h2>Histórico</h2>
-                    <div id="bulk-actions" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;">
-                        <button onclick="window.excluirMassa()" class="btn-icon" style="color: #dc2626; font-weight: bold;">Apagar Selecionados</button>
-                    </div>
+                    <div id="bulk-actions" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;"><button onclick="window.excluirMassa()" class="btn-icon" style="color: #dc2626;">Apagar Selecionados</button></div>
                 </div>
-                <div style="margin-bottom: 10px;"><input type="text" id="busca-historico" placeholder="🔍 Filtrar por produto ou cliente..." onkeyup="window.filtrarHistorico()" style="padding: 10px; width: 100%;"></div>
-                <div class="table-responsive"><table id="tabela-historico"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all"></th><th>Data</th><th>Cliente</th><th>Produto</th><th>Qtd</th><th>Valor</th><th>Pagamento</th><th>Status</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+                <div style="margin-bottom: 10px;"><input type="text" id="busca-historico" placeholder="🔍 Filtrar..." onkeyup="window.filtrarHistorico()" style="padding: 10px; width: 100%;"></div>
+                <div class="table-responsive"><table id="tabela-historico"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all"></th><th class="sortable" onclick="window.ordenarTabela('historico', 'data')">Data <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('historico', 'cliente')">Cliente <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('historico', 'produtoNome')">Produto <i class="fas fa-sort"></i></th><th>Qtd</th><th class="sortable" onclick="window.ordenarTabela('historico', 'total')">Valor <i class="fas fa-sort"></i></th><th>Pagamento</th><th>Status</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
             </section>
 
             <section id="estoque" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h2>Estoque</h2>
-                    <div id="bulk-actions-estoque" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;">
-                        <button onclick="window.excluirMassaEstoque()" class="btn-icon" style="color: #dc2626; font-weight: bold;">Apagar Selecionados</button>
-                    </div>
+                    <div id="bulk-actions-estoque" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;"><button onclick="window.excluirMassaEstoque()" class="btn-icon" style="color: #dc2626;">Apagar Selecionados</button></div>
                 </div>
                 <div class="card form-container">
                     <form id="form-produto">
                         <div class="form-row">
-                            <div class="form-group" style="flex:2"><label>Nome do Produto</label><input list="list-sugestoes-produtos" type="text" id="prod-nome" required placeholder="Ex: Milho..." autocomplete="off"><datalist id="list-sugestoes-produtos"></datalist></div>
+                            <div class="form-group" style="flex:2"><label>Produto</label><input list="list-sugestoes-produtos" type="text" id="prod-nome" required placeholder="Ex: Milho..." autocomplete="off"><datalist id="list-sugestoes-produtos"></datalist></div>
                             <div class="form-group"><label>Categoria</label><div style="display:flex;gap:5px"><select id="prod-categoria" required style="flex:1" onchange="window.atualizarMargemCategoria()"></select><button type="button" id="btn-add-cat" class="btn-primary">+</button><button type="button" id="btn-del-cat" class="btn-icon" style="background: #fee2e2; color: #dc2626; border-radius: 10px;"><i class="fas fa-trash"></i></button></div></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-group"><label>Custo (R$)</label><input type="number" id="prod-custo" step="0.01" required oninput="window.calcularPrecoVenda()"></div>
-                            <div class="form-group"><label>Margem (%)</label><input type="number" id="prod-margem" value="0" oninput="window.calcularPrecoVenda()"></div>
-                            <div class="form-group"><label>Venda (R$)</label><input type="number" id="prod-venda" step="0.01" required></div>
-                            <div class="form-group"><label>Qtd</label><input type="number" id="prod-qtd" required></div>
+                            <div class="form-group"><label>Custo</label><input type="number" id="prod-custo" step="0.01" required oninput="window.calcularPrecoVenda()"></div>
+                            <div class="form-group"><label>Margem (%)</label><input type="number" id="prod-margem" value="30" oninput="window.calcularPrecoVenda()"></div>
+                            <div class="form-group"><label>Venda</label><input type="number" id="prod-venda" step="0.01" required></div>
+                            <div class="form-group"><label>Qtd</label><input type="text" id="prod-qtd" required placeholder="Ex: 10,5"></div>
                         </div>
                         <button type="submit" class="btn-primary" style="width:100%">Salvar / Somar ao Estoque</button>
                     </form>
                 </div>
-                <div style="margin-bottom: 10px;"><input list="list-busca-estoque" type="text" id="busca-estoque" placeholder="🔍 Pesquisar na tabela..." onkeyup="window.filtrarEstoque()" style="padding: 10px; width: 100%;"><datalist id="list-busca-estoque"></datalist></div>
-                <div class="table-responsive"><table id="tabela-estoque"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-stock"></th><th>Produto</th><th>Cat.</th><th>Custo</th><th>Venda</th><th>Estoque</th><th>Ação</th></tr></thead><tbody></tbody></table></div>
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                    <div style="flex: 1;"><label style="font-size:0.8rem">Filtrar por Categoria:</label><select id="filtro-categoria-estoque" onchange="window.aplicarFiltroCategoria()" style="width:100%; padding: 8px; border-radius: 5px; border: 1px solid #cbd5e1;"><option value="TODOS">TODAS AS CATEGORIAS</option></select></div>
+                    <div style="flex: 2;"><label style="font-size:0.8rem">Buscar:</label><input list="list-busca-estoque" type="text" id="busca-estoque" placeholder="Pesquisar..." onkeyup="window.filtrarEstoque()" style="padding: 8px; width: 100%;"><datalist id="list-busca-estoque"></datalist></div>
+                </div>
+                <div class="table-responsive">
+                    <table id="tabela-estoque">
+                        <thead><tr><th style="width:30px"><input type="checkbox" id="select-all-stock"></th><th class="sortable" onclick="window.ordenarTabela('estoque', 'nome')">Produto <i class="fas fa-sort"></i></th><th>Cat.</th><th>Custo Un.</th><th>Venda Un.</th><th class="sortable" onclick="window.ordenarTabela('estoque', 'qtd')">Estoque <i class="fas fa-sort"></i></th><th>Total Custo</th><th>Total Revenda</th><th>Ação</th></tr></thead>
+                        <tbody></tbody>
+                        <tfoot><tr><td colspan="6" style="text-align:right">TOTAIS GERAIS:</td><td id="sum-total-custo">R$ 0,00</td><td id="sum-total-revenda">R$ 0,00</td><td></td></tr></tfoot>
+                    </table>
+                </div>
             </section>
 
             <section id="devedores" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h2>Devedores</h2>
-                    <div id="bulk-actions-devedores" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;">
-                        <button onclick="window.excluirMassaDevedores()" class="btn-icon" style="color: #dc2626; font-weight: bold;">Perdoar Selecionados</button>
-                    </div>
+                    <div id="bulk-actions-devedores" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;"><button onclick="window.excluirMassaDevedores()" class="btn-icon" style="color: #dc2626;">Perdoar Selecionados</button></div>
                 </div>
-                <div style="margin-bottom: 10px;"><input type="text" id="busca-devedores" placeholder="🔍 Pesquisar devedor..." onkeyup="window.filtrarDevedores()" style="padding: 10px; width: 100%;"></div>
-                <div class="table-responsive"><table id="tabela-devedores"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-dev"></th><th>Cliente</th><th>Total Devendo</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+                <div style="margin-bottom: 10px;"><input type="text" id="busca-devedores" placeholder="🔍 Pesquisar..." onkeyup="window.filtrarDevedores()" style="padding: 10px; width: 100%;"></div>
+                <div class="table-responsive"><table id="tabela-devedores"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-dev"></th><th class="sortable" onclick="window.ordenarTabela('devedores', 'nome')">Cliente <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('devedores', 'total')">Total Devendo <i class="fas fa-sort"></i></th><th>Ações</th></tr></thead><tbody></tbody></table></div>
             </section>
         </main>
     </div>
 
-    <div id="modal-abatimento" class="modal-overlay hidden">
-        <div class="modal-box">
-            <h3 style="color: var(--success);"><i class="fas fa-hand-holding-usd"></i> Receber Pagamento</h3>
-            <p style="margin-bottom: 15px; color: #64748b;">Abater valor da dívida de: <strong id="abatimento-cliente-nome" style="color: var(--text-main);"></strong></p>
-            <input type="hidden" id="abatimento-cliente">
-            <div class="form-group"><label>Valor a Pagar (R$)</label><input type="number" id="abatimento-valor" step="0.01" placeholder="Ex: 20.00" style="font-size: 1.2rem; font-weight: bold; color: var(--success);"></div>
-            <div class="form-group"><label>Forma de Pagamento</label><select id="abatimento-metodo"><option value="dinheiro">Dinheiro</option><option value="pix">Pix</option><option value="debito">Débito</option></select></div>
-            <div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-abatimento').classList.add('hidden')" style="background:#e2e8f0; color: #334155; flex:1">Cancelar</button><button onclick="window.salvarAbatimento()" class="btn-success" style="flex:1">Confirmar Pagamento</button></div>
-        </div>
-    </div>
-
-    <div id="modal-cliente-edit" class="modal-overlay hidden">
-        <div class="modal-box">
-            <h3>Editar Cliente</h3>
-            <input type="hidden" id="edit-cli-id">
-            <div class="form-group"><label>Nome</label><input type="text" id="edit-cli-nome"></div>
-            <div class="form-group"><label>Tel</label><input type="text" id="edit-cli-tel"></div>
-            <div class="form-group"><label>CPF</label><input type="text" id="edit-cli-cpf"></div>
-            <div class="form-group"><label>Endereço</label><input type="text" id="edit-cli-endereco"></div>
-            <div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-cliente-edit').classList.add('hidden')" style="background:#ccc; flex:1">Cancelar</button><button onclick="window.salvarEdicaoCliente()" class="btn-primary" style="flex:1">Salvar</button></div>
-        </div>
-    </div>
-
-    <div id="modal-gasto-edit" class="modal-overlay hidden">
-        <div class="modal-box">
-            <h3>Editar Despesa</h3>
-            <input type="hidden" id="edit-gasto-id">
-            <div class="form-group"><label>Descrição</label><input type="text" id="edit-gasto-nome"></div>
-            <div class="form-group"><label>Valor (R$)</label><input type="number" id="edit-gasto-valor" step="0.01"></div>
-            <div style="display: flex; gap: 10px;">
-                <div class="form-group"><label>Data Entrada</label><input type="date" id="edit-gasto-data"></div>
-                <div class="form-group"><label>Vencimento</label><input type="date" id="edit-gasto-venc"></div>
-            </div>
-            <div class="form-group"><label>Status</label><select id="edit-gasto-status" onchange="window.toggleCamposPagamento('edit-gasto-status', 'container-pagamento-edit')"><option value="pendente">Pendente</option><option value="pago">Pago</option></select></div>
-            <div id="container-pagamento-edit" class="hidden" style="background: #f0fdf4; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
-                <div class="form-group"><label>Método</label><select id="edit-gasto-metodo"><option value="dinheiro">Dinheiro</option><option value="pix">Pix</option><option value="boleto">Boleto</option><option value="cartao">Cartão</option></select></div>
-                <div class="form-group"><label>Banco</label><select id="edit-gasto-banco"><option value="">Selecione...</option></select></div>
-            </div>
-            <div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-gasto-edit').classList.add('hidden')" style="background:#ccc; flex:1">Cancelar</button><button onclick="window.salvarEdicaoGasto()" class="btn-primary" style="flex:1">Salvar</button></div>
-        </div>
-    </div>
-
-    <div id="modal-bancos" class="modal-overlay hidden">
-        <div class="modal-box">
-            <h3>Gerenciar Bancos</h3>
-            <div style="display:flex; gap:10px; margin-bottom:15px"><input type="text" id="novo-banco-nome" placeholder="Nome do Banco"><button onclick="window.adicionarBanco()" class="btn-primary">+</button></div>
-            <ul id="lista-bancos" style="list-style:none; padding:0; max-height:200px; overflow-y:auto;"></ul>
-            <button onclick="document.getElementById('modal-bancos').classList.add('hidden')" style="width:100%; margin-top:15px; background:#ccc">Fechar</button>
-        </div>
-    </div>
-
-    <div id="modal-editar" class="modal-overlay hidden">
-        <div class="modal-box">
-            <h3>Editar Venda</h3>
-            <input type="hidden" id="edit-id">
-            <div class="form-group"><label>Valor</label><input type="number" id="edit-valor" step="0.01"></div>
-            <div class="form-group"><label>Método</label><select id="edit-metodo"><option value="dinheiro">Dinheiro</option><option value="pix">Pix</option><option value="debito">Débito</option><option value="credito">Crédito</option><option value="aver">Fiado</option></select></div>
-            <div style="display:flex; gap:10px; margin-top:20px"><button onclick="window.fecharModalEdicao()" style="background:#ccc; flex:1">Cancelar</button><button onclick="window.salvarEdicaoVenda()" class="btn-primary" style="flex:1">Salvar</button></div>
-        </div>
-    </div>
-    
-    <div id="modal-prod" class="modal-overlay hidden">
-        <div class="modal-box">
-            <h3>Editar Produto</h3>
-            <input type="hidden" id="edit-prod-id">
-            <div class="form-group"><label>Nome</label><input type="text" id="edit-prod-nome"></div>
-            <div class="form-group"><label>Custo</label><input type="number" id="edit-prod-custo" step="0.01"></div>
-            <div class="form-group"><label>Venda</label><input type="number" id="edit-prod-venda" step="0.01"></div>
-            <div class="form-group"><label>Estoque Atual</label><input type="number" id="edit-prod-qtd"></div>
-            <div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-prod').classList.add('hidden')" style="background:#ccc; flex:1">Cancelar</button><button onclick="window.salvarEdicaoProduto()" class="btn-primary" style="flex:1">Salvar</button></div>
-        </div>
-    </div>
-
-    <div id="modal-devedor" class="modal-overlay hidden">
-        <div class="modal-box" style="max-width: 600px;">
-            <div style="display:flex; justify-content:space-between; align-items:center"><h3 id="titulo-devedor">Extrato</h3><button onclick="document.getElementById('modal-devedor').classList.add('hidden')" style="background:none; border:none; font-size:1.5rem">&times;</button></div>
-            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; margin-top: 10px;"><table id="tabela-detalhes-devedor"><thead><tr><th>Data</th><th>Produto</th><th>Valor</th></tr></thead><tbody></tbody></table></div>
-            <div style="text-align: right; margin-top: 15px;"><h3>Total: <span id="total-divida-modal" style="color: var(--danger)">R$ 0,00</span></h3></div>
-        </div>
-    </div>
-
-    <div id="modal-backup" class="modal-overlay hidden">
-        <div class="modal-box" style="text-align: center;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;"><h3>Gerenciar Backup</h3><button onclick="document.getElementById('modal-backup').classList.add('hidden')" class="btn-icon">&times;</button></div>
-            <p style="color: #64748b; margin-bottom: 20px;">Salve seus dados em um arquivo ou restaure de um arquivo antigo.</p>
-            <button onclick="window.exportarDadosBackup()" class="btn-primary" style="width: 100%; margin-bottom: 15px; padding: 15px;"><i class="fas fa-download"></i> Exportar Dados (Baixar Arquivo)</button>
-            <div style="border-top: 1px solid #e2e8f0; margin: 15px 0; padding-top: 15px;">
-                <label for="input-import" class="btn-success" style="display: block; width: 100%; padding: 15px; cursor: pointer;"><i class="fas fa-upload"></i> Importar Dados (Carregar Arquivo)</label>
-                <input type="file" id="input-import" accept=".json" style="display: none;" onchange="window.importarDadosBackup(this)">
-            </div>
-        </div>
-    </div>
+    <div id="modal-alert" class="modal-overlay hidden"><div class="modal-box custom-modal-content"><i id="alert-icon" class="fas fa-info-circle custom-icon icon-info"></i><h3 id="alert-title">Atenção</h3><p id="alert-msg" style="margin: 15px 0; font-size: 1.1rem; color: #334155;"></p><button onclick="document.getElementById('modal-alert').classList.add('hidden')" class="btn-primary" style="min-width: 100px;">OK</button></div></div>
+    <div id="modal-prompt" class="modal-overlay hidden"><div class="modal-box custom-modal-content"><h3 id="prompt-title">Inserir Dados</h3><p id="prompt-msg" style="margin-bottom:10px"></p><input type="text" id="prompt-input" style="width: 100%; font-size: 1.1rem; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px;"><div class="modal-actions"><button onclick="document.getElementById('modal-prompt').classList.add('hidden')" style="background:#e2e8f0; color:#334155; padding:10px 20px; border-radius:8px; border:none; cursor:pointer">Cancelar</button><button id="btn-confirm-prompt" class="btn-primary">Confirmar</button></div></div></div>
+    <div id="modal-confirm" class="modal-overlay hidden"><div class="modal-box custom-modal-content"><i class="fas fa-question-circle custom-icon icon-warning"></i><h3 id="confirm-title">Tem certeza?</h3><p id="confirm-msg" style="margin: 15px 0;"></p><div class="modal-actions"><button onclick="document.getElementById('modal-confirm').classList.add('hidden')" style="background:#e2e8f0; color:#334155; padding:10px 20px; border-radius:8px; border:none; cursor:pointer">Não</button><button id="btn-confirm-action" class="btn-primary" style="background:#ef4444">Sim</button></div></div></div>
+    <div id="modal-low-stock" class="modal-overlay hidden"><div class="modal-box"><div style="text-align: center;"><i class="fas fa-exclamation-triangle custom-icon icon-warning"></i><h3>Estoque Baixo (≤ 5)</h3></div><div id="low-stock-list" style="max-height: 300px; overflow-y: auto; margin: 15px 0; border: 1px solid #e2e8f0; border-radius: 8px;"></div><button onclick="document.getElementById('modal-low-stock').classList.add('hidden')" class="btn-primary" style="width:100%">Entendido</button></div></div>
+    <div id="modal-metodos" class="modal-overlay hidden"><div class="modal-box"><h3>Formas de Pagamento</h3><div style="display:flex; gap:10px; margin-bottom:15px"><input type="text" id="novo-metodo-nome" placeholder="Ex: Ticket Alimentação"><button onclick="window.adicionarMetodoPagamento()" class="btn-primary">+</button></div><ul id="lista-metodos" style="list-style:none; padding:0; max-height:200px; overflow-y:auto;"></ul><button onclick="document.getElementById('modal-metodos').classList.add('hidden')" style="width:100%; margin-top:15px; background:#ccc">Fechar</button></div></div>
+    <div id="modal-relatorio" class="modal-overlay hidden"><div class="modal-box" style="max-width: 700px;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px"><h3>Relatório de Vendas</h3><button onclick="document.getElementById('modal-relatorio').classList.add('hidden')" class="btn-icon">&times;</button></div><div style="margin-bottom: 15px;"><label>Filtrar Top:</label><select id="relatorio-filtro" onchange="window.gerarGraficoRelatorio()" style="padding: 5px; border-radius: 5px;"><option value="5">Top 5</option><option value="10" selected>Top 10</option><option value="20">Top 20</option><option value="9999">Todos</option></select></div><div class="canvas-wrapper" style="height: 350px;"><canvas id="chartRelatorio"></canvas></div></div></div>
+    <div id="modal-abatimento" class="modal-overlay hidden"><div class="modal-box"><h3 style="color: var(--success);"><i class="fas fa-hand-holding-usd"></i> Receber Pagamento</h3><p style="margin-bottom: 15px; color: #64748b;">Abater de: <strong id="abatimento-cliente-nome"></strong></p><input type="hidden" id="abatimento-cliente"><div class="form-group"><label>Valor (R$)</label><input type="number" id="abatimento-valor" step="0.01"></div><div class="form-group"><label>Forma</label><select id="abatimento-metodo"></select></div><div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-abatimento').classList.add('hidden')" style="background:#e2e8f0; color: #334155; flex:1">Cancelar</button><button onclick="window.salvarAbatimento()" class="btn-success" style="flex:1">Confirmar</button></div></div></div>
+    <div id="modal-cliente-edit" class="modal-overlay hidden"><div class="modal-box"><h3>Editar Cliente</h3><input type="hidden" id="edit-cli-id"><div class="form-group"><label>Nome</label><input type="text" id="edit-cli-nome"></div><div class="form-group"><label>Tel</label><input type="text" id="edit-cli-tel"></div><div class="form-group"><label>CPF</label><input type="text" id="edit-cli-cpf"></div><div class="form-group"><label>Endereço</label><input type="text" id="edit-cli-endereco"></div><div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-cliente-edit').classList.add('hidden')" style="background:#ccc; flex:1">Cancelar</button><button onclick="window.salvarEdicaoCliente()" class="btn-primary" style="flex:1">Salvar</button></div></div></div>
+    <div id="modal-gasto-edit" class="modal-overlay hidden"><div class="modal-box"><h3>Editar Despesa</h3><input type="hidden" id="edit-gasto-id"><div class="form-group"><label>Descrição</label><input type="text" id="edit-gasto-nome"></div><div class="form-group"><label>Valor (R$)</label><input type="number" id="edit-gasto-valor" step="0.01"></div><div style="display: flex; gap: 10px;"><div class="form-group"><label>Data Entrada</label><input type="date" id="edit-gasto-data"></div><div class="form-group"><label>Vencimento</label><input type="date" id="edit-gasto-venc"></div></div><div class="form-group"><label>Status</label><select id="edit-gasto-status" onchange="window.toggleCamposPagamento('edit-gasto-status', 'container-pagamento-edit')"><option value="pendente">Pendente</option><option value="pago">Pago</option></select></div><div id="container-pagamento-edit" class="hidden" style="background: #f0fdf4; padding: 10px; border-radius: 8px; margin-bottom: 15px;"><div class="form-group"><label>Método</label><select id="edit-gasto-metodo"></select></div><div class="form-group"><label>Banco</label><select id="edit-gasto-banco"><option value="">Selecione...</option></select></div></div><div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-gasto-edit').classList.add('hidden')" style="background:#ccc; flex:1">Cancelar</button><button onclick="window.salvarEdicaoGasto()" class="btn-primary" style="flex:1">Salvar</button></div></div></div>
+    <div id="modal-bancos" class="modal-overlay hidden"><div class="modal-box"><h3>Gerenciar Bancos</h3><div style="display:flex; gap:10px; margin-bottom:15px"><input type="text" id="novo-banco-nome" placeholder="Nome do Banco"><button onclick="window.adicionarBanco()" class="btn-primary">+</button></div><ul id="lista-bancos" style="list-style:none; padding:0; max-height:200px; overflow-y:auto;"></ul><button onclick="document.getElementById('modal-bancos').classList.add('hidden')" style="width:100%; margin-top:15px; background:#ccc">Fechar</button></div></div>
+    <div id="modal-editar" class="modal-overlay hidden"><div class="modal-box"><h3>Editar Venda</h3><input type="hidden" id="edit-id"><div class="form-group"><label>Valor</label><input type="number" id="edit-valor" step="0.01"></div><div class="form-group"><label>Método</label><select id="edit-metodo"></select></div><div style="display:flex; gap:10px; margin-top:20px"><button onclick="window.fecharModalEdicao()" style="background:#ccc; flex:1">Cancelar</button><button onclick="window.salvarEdicaoVenda()" class="btn-primary" style="flex:1">Salvar</button></div></div></div>
+    <div id="modal-prod" class="modal-overlay hidden"><div class="modal-box"><h3>Editar Produto</h3><input type="hidden" id="edit-prod-id"><div class="form-group"><label>Nome</label><input type="text" id="edit-prod-nome"></div><div class="form-group"><label>Custo</label><input type="number" id="edit-prod-custo" step="0.01"></div><div class="form-group"><label>Venda</label><input type="number" id="edit-prod-venda" step="0.01"></div><div class="form-group"><label>Estoque Atual</label><input type="number" id="edit-prod-qtd" step="0.001"></div><div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-prod').classList.add('hidden')" style="background:#ccc; flex:1">Cancelar</button><button onclick="window.salvarEdicaoProduto()" class="btn-primary" style="flex:1">Salvar</button></div></div></div>
+    <div id="modal-devedor" class="modal-overlay hidden"><div class="modal-box" style="max-width: 600px;"><div style="display:flex; justify-content:space-between; align-items:center"><h3 id="titulo-devedor">Extrato</h3><button onclick="document.getElementById('modal-devedor').classList.add('hidden')" style="background:none; border:none; font-size:1.5rem">&times;</button></div><div class="table-responsive" style="max-height: 400px; overflow-y: auto; margin-top: 10px;"><table id="tabela-detalhes-devedor"><thead><tr><th>Data</th><th>Produto</th><th>Valor</th></tr></thead><tbody></tbody></table></div><div style="text-align: right; margin-top: 15px;"><h3>Total: <span id="total-divida-modal" style="color: var(--danger)">R$ 0,00</span></h3></div></div></div>
+    <div id="modal-backup" class="modal-overlay hidden"><div class="modal-box" style="text-align: center;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;"><h3>Gerenciar Backup</h3><button onclick="document.getElementById('modal-backup').classList.add('hidden')" class="btn-icon">&times;</button></div><p style="color: #64748b; margin-bottom: 20px;">Salve seus dados em um arquivo ou restaure de um arquivo antigo.</p><button onclick="window.exportarDadosBackup()" class="btn-primary" style="width: 100%; margin-bottom: 15px; padding: 15px;"><i class="fas fa-download"></i> Exportar Dados (Baixar Arquivo)</button><div style="border-top: 1px solid #e2e8f0; margin: 15px 0; padding-top: 15px;"><label for="input-import" class="btn-success" style="display: block; width: 100%; padding: 15px; cursor: pointer;"><i class="fas fa-upload"></i> Importar Dados (Carregar Arquivo)</label><input type="file" id="input-import" accept=".json" style="display: none;" onchange="window.importarDadosBackup(this)"></div></div></div>
 
     <script type="module" src="app.js"></script>
 </body>
