@@ -1,11 +1,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
        from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, doc, updateDoc, deleteDoc, increment, getDoc, writeBatch } 
+import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, doc, updateDoc, deleteDoc, increment, getDoc, writeBatch, enableIndexedDbPersistence } 
        from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
 // ============================================================
-// 1. CONFIGURAÇÃO FIREBASE
+// 1. CONFIGURAÇÃO
 // ============================================================
 const firebaseConfig = {
   apiKey: "AIzaSyBx34219zAWq6qtvs7qO3-SMSVRHJ5dX8M",
@@ -22,8 +22,17 @@ try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
+    
+    // ATIVAR CACHE OFFLINE (Deixa o carregamento instantâneo)
+    enableIndexedDbPersistence(db).catch((err) => {
+        if (err.code == 'failed-precondition') {
+            console.log('Múltiplas abas abertas. Persistência habilitada apenas em uma.');
+        } else if (err.code == 'unimplemented') {
+            console.log('Navegador não suporta persistência.');
+        }
+    });
 } catch (e) {
-    console.error("Erro Conexão:", e);
+    console.error("Erro Firebase:", e);
 }
 
 // ============================================================
@@ -58,7 +67,7 @@ const COLECAO_BANCOS = 'loja_bancos';
 const COLECAO_METODOS = 'loja_metodos_pagamento';
 
 // ============================================================
-// 3. UTILITÁRIOS DE UI (Janelas)
+// 3. UTILITÁRIOS (UI)
 // ============================================================
 window.mostrarLoading = (show) => {
     const el = document.getElementById('loading-indicator');
@@ -110,7 +119,6 @@ window.mostrarPrompt = (titulo, msg) => {
 
 window.alert = (msg) => window.mostrarAlerta("Aviso", msg, 'info');
 
-// Ordenação Genérica
 window.ordenarTabela = (tipo, coluna) => {
     if (ordenacaoAtual.coluna === coluna) {
         ordenacaoAtual.direcao = ordenacaoAtual.direcao === 'asc' ? 'desc' : 'asc';
@@ -134,42 +142,89 @@ window.ordenarTabela = (tipo, coluna) => {
     else if (tipo === 'devedores') { devedoresCache.sort(sortFn); renderizarTabelaDevedores(); }
 };
 
+function configurarCheckboxes(m,c,b,cnt){
+    const master=document.getElementById(m);
+    const checks=document.querySelectorAll('.'+c);
+    const bar=document.getElementById(b);
+    if(!master)return;
+    master.onclick=()=>{checks.forEach(k=>k.checked=master.checked);up();};
+    checks.forEach(k=>k.onclick=()=>{if(!k.checked)master.checked=false;up();});
+    function up(){const n=document.querySelectorAll('.'+c+':checked').length;if(n>0)bar.classList.remove('hidden');else bar.classList.add('hidden');}
+}
+
 // ============================================================
 // 4. FUNÇÕES PRINCIPAIS (Declaradas para hoisting correto)
 // ============================================================
 
-// --- ESTOQUE ---
+// --- ESTOQUE (OTIMIZADO) ---
 async function carregarEstoque() {
+    // Busca otimizada: Cache primeiro, depois rede
     const snap = await getDocs(query(collection(db, COLECAO_PRODUTOS), orderBy("nome")));
     produtosCache = [];
+    
+    // Fragmento de documento para não redesenhar o DOM a cada item
     const dv = document.getElementById('list-produtos-venda');
     const dbusca = document.getElementById('list-busca-estoque');
     const dsug = document.getElementById('list-sugestoes-produtos');
-    if(dv) dv.innerHTML = ''; if(dbusca) dbusca.innerHTML = ''; if(dsug) dsug.innerHTML = '';
+    
+    // Limpa datalists
+    if(dv) dv.innerHTML = ''; 
+    if(dbusca) dbusca.innerHTML = ''; 
+    if(dsug) dsug.innerHTML = '';
+
+    // Cria strings grandes para o HTML dos datalists (Muito mais rápido)
+    let optionsHtml = '';
+
     snap.forEach(d => {
         const p = d.data();
         produtosCache.push({ id: d.id, ...p });
-        const o = document.createElement('option'); o.value = p.nome;
-        if(dv) dv.appendChild(o.cloneNode(true));
-        if(dbusca) dbusca.appendChild(o.cloneNode(true));
-        if(dsug) dsug.appendChild(o.cloneNode(true));
+        optionsHtml += `<option value="${p.nome}">`;
     });
+
+    // Injeta HTML de uma vez
+    if(dv) dv.innerHTML = optionsHtml;
+    if(dbusca) dbusca.innerHTML = optionsHtml;
+    if(dsug) dsug.innerHTML = optionsHtml;
+
     renderizarTabelaEstoque();
 }
-window.carregarEstoque = carregarEstoque; // Expor para botão
+window.carregarEstoque = carregarEstoque;
 
 function renderizarTabelaEstoque() {
     const tb = document.querySelector('#tabela-estoque tbody');
     if(!tb) return;
-    tb.innerHTML = '';
-    let sumCusto = 0; let sumRevenda = 0;
+    
+    let sumCusto = 0; 
+    let sumRevenda = 0;
     const lista = filtroCategoriaEstoque === "TODOS" ? produtosCache : produtosCache.filter(p => p.categoria === filtroCategoriaEstoque);
+
+    // CONSTRUÇÃO DE HTML EM BUFFER (RÁPIDO)
+    let htmlBuffer = '';
+    
     lista.forEach(p => {
         const totC = (p.custo||0)*(p.qtd||0);
         const totR = (p.venda||0)*(p.qtd||0);
         sumCusto += totC; sumRevenda += totR;
-        tb.innerHTML += `<tr><td style="text-align:center"><input type="checkbox" class="stock-checkbox" value="${p.id}"></td><td>${p.nome}</td><td><span class="badge" style="background:#e0e7ff; color:#3730a3">${p.categoria||'GER'}</span></td><td>R$ ${p.custo.toFixed(2)}</td><td>R$ ${p.venda.toFixed(2)}</td><td style="font-weight:bold; color:${p.qtd<=5?'red':'inherit'}">${p.qtd}</td><td style="color:#64748b">R$ ${totC.toFixed(2)}</td><td style="color:#10b981; font-weight:bold">R$ ${totR.toFixed(2)}</td><td><button onclick="window.abrirEditarProduto('${p.id}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button><button onclick="window.excluirProduto('${p.id}')" class="btn-icon btn-delete"><i class="fas fa-trash"></i></button></td></tr>`;
+        
+        htmlBuffer += `<tr>
+            <td style="text-align:center"><input type="checkbox" class="stock-checkbox" value="${p.id}"></td>
+            <td>${p.nome}</td>
+            <td><span class="badge" style="background:#e0e7ff; color:#3730a3">${p.categoria||'GER'}</span></td>
+            <td>R$ ${p.custo.toFixed(2)}</td>
+            <td>R$ ${p.venda.toFixed(2)}</td>
+            <td style="font-weight:bold; color:${p.qtd<=5?'red':'inherit'}">${p.qtd}</td>
+            <td style="color:#64748b">R$ ${totC.toFixed(2)}</td>
+            <td style="color:#10b981; font-weight:bold">R$ ${totR.toFixed(2)}</td>
+            <td>
+                <button onclick="window.abrirEditarProduto('${p.id}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button>
+                <button onclick="window.excluirProduto('${p.id}')" class="btn-icon btn-delete"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>`;
     });
+
+    // Atualiza o DOM uma única vez
+    tb.innerHTML = htmlBuffer;
+
     const elSumCusto = document.getElementById('sum-total-custo');
     const elSumRev = document.getElementById('sum-total-revenda');
     if(elSumCusto) elSumCusto.innerText = `R$ ${sumCusto.toFixed(2)}`;
@@ -184,13 +239,15 @@ window.verificarEstoqueBaixo = (forcarAbrir = false) => {
     if(divLista) {
         divLista.innerHTML = '';
         if (lista.length > 0) {
-            lista.forEach(p => { divLista.innerHTML += `<div class="stock-warning-item"><span>${p.nome}</span><span style="font-weight:bold; color:red">${p.qtd} un.</span></div>`; });
+            let html = '';
+            lista.forEach(p => { html += `<div class="stock-warning-item"><span>${p.nome}</span><span style="font-weight:bold; color:red">${p.qtd} un.</span></div>`; });
+            divLista.innerHTML = html;
             if (forcarAbrir || sessionStorage.getItem('estoqueBaixoVisto') !== 'true') { document.getElementById('modal-low-stock').classList.remove('hidden'); sessionStorage.setItem('estoqueBaixoVisto', 'true'); }
         } else { if(forcarAbrir) window.mostrarAlerta("Tudo Certo", "Nenhum produto com estoque baixo.", "success"); }
     }
 };
 
-// --- GASTOS ---
+// --- GASTOS (OTIMIZADO) ---
 async function carregarGastos() {
     const mesInput = document.getElementById('mes-gastos').value; 
     const [ano, mes] = mesInput.split('-');
@@ -207,38 +264,47 @@ window.carregarGastos = carregarGastos;
 function renderizarTabelaGastos() {
     const tbody = document.querySelector('#tabela-gastos tbody');
     if(!tbody) return;
-    tbody.innerHTML = '';
+    
     let totalMes = 0;
     const statusCount = { pago: 0, pendente: 0 };
     const metodoCount = {};
     const evolucaoDia = {};
+    let htmlBuffer = '';
+
     gastosCache.forEach(g => {
         totalMes += g.valor;
         const dataF = new Date(g.dataEntrada.seconds * 1000).toLocaleDateString('pt-BR');
         const vencF = g.vencimento ? new Date(g.vencimento).toLocaleDateString('pt-BR') : '-';
         const badge = g.status === 'pago' ? 'badge-success' : 'badge-danger';
+        
         if(g.status === 'pago') statusCount.pago += g.valor; else statusCount.pendente += g.valor;
         if(g.status === 'pago' && g.metodo) metodoCount[g.metodo] = (metodoCount[g.metodo] || 0) + g.valor;
         const dia = new Date(g.dataEntrada.seconds * 1000).getDate();
         evolucaoDia[dia] = (evolucaoDia[dia] || 0) + g.valor;
-        tbody.innerHTML += `<tr><td style="text-align:center"><input type="checkbox" class="gasto-checkbox" value="${g.id}"></td><td>${dataF}</td><td>${g.nome}</td><td>${g.banco||'-'}</td><td>${g.metodo||'-'}</td><td>${vencF}</td><td>R$ ${g.valor.toFixed(2)}</td><td><span class="badge ${badge}">${g.status.toUpperCase()}</span></td><td><button onclick="window.abrirEditarGasto('${g.id}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button><button onclick="window.excluirGasto('${g.id}')" class="btn-icon btn-delete"><i class="fas fa-trash"></i></button></td></tr>`;
+
+        htmlBuffer += `<tr><td style="text-align:center"><input type="checkbox" class="gasto-checkbox" value="${g.id}"></td><td>${dataF}</td><td>${g.nome}</td><td>${g.banco||'-'}</td><td>${g.metodo||'-'}</td><td>${vencF}</td><td>R$ ${g.valor.toFixed(2)}</td><td><span class="badge ${badge}">${g.status.toUpperCase()}</span></td><td><button onclick="window.abrirEditarGasto('${g.id}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button><button onclick="window.excluirGasto('${g.id}')" class="btn-icon btn-delete"><i class="fas fa-trash"></i></button></td></tr>`;
     });
+    
+    tbody.innerHTML = htmlBuffer;
     document.getElementById('kpi-gastos').innerText = `R$ ${totalMes.toFixed(2)}`;
     configurarCheckboxes('select-all-gastos', 'gasto-checkbox', 'bulk-actions-gastos', null);
     renderGastosCharts(statusCount, metodoCount, evolucaoDia);
 }
 
-// --- CLIENTES ---
+// --- CLIENTES (OTIMIZADO) ---
 async function carregarClientes() {
     const snap = await getDocs(query(collection(db, COLECAO_CLIENTES), orderBy("nome")));
     clientesCache = [];
     const datalist = document.getElementById('list-clientes-venda');
-    if(datalist) datalist.innerHTML = '<option value="Consumidor Final">';
+    
+    let optionsHtml = '<option value="Consumidor Final">';
     snap.forEach(d => { 
         const c = d.data(); 
         clientesCache.push({ id: d.id, ...c });
-        if(datalist) { const opt = document.createElement('option'); opt.value = c.nome; datalist.appendChild(opt); }
+        optionsHtml += `<option value="${c.nome}">`;
     });
+    
+    if(datalist) datalist.innerHTML = optionsHtml;
     renderizarTabelaClientes();
 }
 window.carregarClientes = carregarClientes;
@@ -246,14 +312,15 @@ window.carregarClientes = carregarClientes;
 function renderizarTabelaClientes() {
     const tbody = document.querySelector('#tabela-clientes tbody');
     if(!tbody) return;
-    tbody.innerHTML = '';
+    let htmlBuffer = '';
     clientesCache.forEach(c => {
-        tbody.innerHTML += `<tr><td style="text-align:center"><input type="checkbox" class="cli-checkbox" value="${c.id}"></td><td>${c.nome}</td><td>${c.tel||'-'}</td><td>${c.cpf||'-'}</td><td><button onclick="window.abrirEditarCliente('${c.id}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button><button onclick="window.excluirCliente('${c.id}')" class="btn-icon btn-delete"><i class="fas fa-trash"></i></button></td></tr>`;
+        htmlBuffer += `<tr><td style="text-align:center"><input type="checkbox" class="cli-checkbox" value="${c.id}"></td><td>${c.nome}</td><td>${c.tel||'-'}</td><td>${c.cpf||'-'}</td><td><button onclick="window.abrirEditarCliente('${c.id}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button><button onclick="window.excluirCliente('${c.id}')" class="btn-icon btn-delete"><i class="fas fa-trash"></i></button></td></tr>`;
     });
+    tbody.innerHTML = htmlBuffer;
     configurarCheckboxes('select-all-cli', 'cli-checkbox', 'bulk-actions-clientes', null);
 }
 
-// --- DEVEDORES ---
+// --- DEVEDORES (OTIMIZADO) ---
 async function carregarDevedores() {
     const s = await getDocs(query(collection(db,COLECAO_VENDAS),where("pago","==",false)));
     const dvMap = {};
@@ -266,14 +333,15 @@ window.carregarDevedores = carregarDevedores;
 function renderizarTabelaDevedores() {
     const tbody = document.querySelector('#tabela-devedores tbody');
     if(!tbody) return;
-    tbody.innerHTML = '';
+    let htmlBuffer = '';
     devedoresCache.forEach(d => {
-        tbody.innerHTML += `<tr><td style="text-align:center"><input type="checkbox" class="dev-checkbox" value="${d.nome}"></td><td>${d.nome}</td><td style="color:var(--danger)">R$ ${d.total.toFixed(2)}</td><td><button onclick="window.verDetalhesDevedor('${d.nome}')" class="btn-primary" style="font-size:0.8rem;margin-right:5px">Ver</button><button onclick="window.abrirModalAbatimento('${d.nome}')" class="btn-success" style="font-size:0.8rem;padding:6px 14px"><i class="fas fa-hand-holding-usd"></i> Pagar</button></td></tr>`;
+        htmlBuffer += `<tr><td style="text-align:center"><input type="checkbox" class="dev-checkbox" value="${d.nome}"></td><td>${d.nome}</td><td style="color:var(--danger)">R$ ${d.total.toFixed(2)}</td><td><button onclick="window.verDetalhesDevedor('${d.nome}')" class="btn-primary" style="font-size:0.8rem;margin-right:5px">Ver</button><button onclick="window.abrirModalAbatimento('${d.nome}')" class="btn-success" style="font-size:0.8rem;padding:6px 14px"><i class="fas fa-hand-holding-usd"></i> Pagar</button></td></tr>`;
     });
+    tbody.innerHTML = htmlBuffer;
     configurarCheckboxes('select-all-dev','dev-checkbox','bulk-actions-devedores',null);
 }
 
-// --- HISTÓRICO ---
+// --- HISTÓRICO (OTIMIZADO) ---
 async function carregarHistorico() {
     const i = new Date(document.getElementById('data-inicio').value+'T00:00:00');
     const f = new Date(document.getElementById('data-fim').value+'T23:59:59');
@@ -288,7 +356,7 @@ window.carregarHistorico = carregarHistorico;
 function renderizarTabelaHistorico() {
     const tbody = document.querySelector('#tabela-historico tbody');
     if(!tbody) return;
-    tbody.innerHTML = '';
+    let htmlBuffer = '';
     historicoCache.forEach(v => {
         const dataF = v.data && v.data.seconds ? new Date(v.data.seconds * 1000).toLocaleDateString('pt-BR') : '-';
         let pg = v.metodo === 'aver' ? 'Fiado' : v.metodo;
@@ -296,8 +364,10 @@ function renderizarTabelaHistorico() {
         let st = v.pago ? 'PAGO' : 'PENDENTE';
         let rowStyle = '';
         if(v.total < 0 && !v.pago) { b = 'badge-success'; st = 'PAGTO DÍVIDA'; rowStyle = 'style="background:#f0fdf4"'; }
-        tbody.innerHTML += `<tr ${rowStyle}><td style="text-align:center"><input type="checkbox" class="sale-checkbox" value="${v.id}"></td><td>${dataF}</td><td>${v.cliente}</td><td>${v.produtoNome}</td><td>${v.qtd||1}</td><td style="${v.total<0?'color:green;font-weight:bold':''}">${v.total<0?'R$ '+Math.abs(v.total).toFixed(2)+' (Abatido)':'R$ '+v.total.toFixed(2)}</td><td>${pg}</td><td><span class="badge ${b}">${st}</span></td><td><button onclick="window.abrirEdicao('${v.id}','${v.total}','${v.metodo}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button></td></tr>`;
+        
+        htmlBuffer += `<tr ${rowStyle}><td style="text-align:center"><input type="checkbox" class="sale-checkbox" value="${v.id}"></td><td>${dataF}</td><td>${v.cliente}</td><td>${v.produtoNome}</td><td>${v.qtd||1}</td><td style="${v.total<0?'color:green;font-weight:bold':''}">${v.total<0?'R$ '+Math.abs(v.total).toFixed(2)+' (Abatido)':'R$ '+v.total.toFixed(2)}</td><td>${pg}</td><td><span class="badge ${b}">${st}</span></td><td><button onclick="window.abrirEdicao('${v.id}','${v.total}','${v.metodo}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button></td></tr>`;
     });
+    tbody.innerHTML = htmlBuffer;
     configurarCheckboxes('select-all','sale-checkbox','bulk-actions',null);
 }
 
@@ -354,105 +424,85 @@ window.carregarBancos = carregarBancos;
 // 5. INICIALIZAÇÃO E EVENTOS
 // ============================================================
 document.addEventListener("DOMContentLoaded", () => {
-    // Configura Datas
-    const hoje = new Date();
-    const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-    document.getElementById('data-inicio').valueAsDate = inicio;
-    document.getElementById('data-fim').valueAsDate = fim;
-    document.getElementById('mes-gastos').value = hoje.toISOString().slice(0, 7);
-    document.getElementById('venda-data').valueAsDate = hoje;
-
-    // Login
+    // 1. Login
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            try { await signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value); }
-            catch (error) { document.getElementById('login-msg').innerText = "Erro: " + error.message; }
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const msg = document.getElementById('login-msg');
+            msg.innerText = "Conectando...";
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                console.error("Erro login:", error);
+                let txt = "Erro ao entrar.";
+                if(error.code === 'auth/wrong-password') txt = "Senha incorreta.";
+                if(error.code === 'auth/user-not-found') txt = "Usuário não encontrado.";
+                msg.innerText = txt;
+            }
         });
     }
 
-    // Sidebar & Tema
+    // 2. Datas Padrão
+    const hoje = new Date();
+    const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+    const elInicio = document.getElementById('data-inicio');
+    const elFim = document.getElementById('data-fim');
+    if(elInicio) elInicio.valueAsDate = inicio;
+    if(elFim) elFim.valueAsDate = fim;
+    const elMes = document.getElementById('mes-gastos');
+    if(elMes) elMes.value = hoje.toISOString().slice(0, 7);
+    const elVendaDt = document.getElementById('venda-data');
+    if(elVendaDt) elVendaDt.valueAsDate = hoje;
+
+    // 3. Abas
+    const menuItems = document.querySelectorAll('.menu li');
+    if(menuItems.length > 0) {
+        menuItems.forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.menu li').forEach(li => li.classList.remove('active'));
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                item.classList.add('active');
+                const target = item.getAttribute('data-target');
+                const targetEl = document.getElementById(target);
+                if(targetEl) targetEl.classList.add('active');
+                const filtroGeral = document.getElementById('filtro-periodo-geral');
+                const filtroGastos = document.getElementById('filtro-mes-gastos');
+                if(filtroGeral && filtroGastos) {
+                    if (target === 'gastos') {
+                        filtroGeral.classList.add('hidden');
+                        filtroGastos.classList.remove('hidden');
+                        window.carregarGastos();
+                    } else if (target === 'dashboard' || target === 'historico') {
+                        filtroGeral.classList.remove('hidden');
+                        filtroGastos.classList.add('hidden');
+                        if(target === 'dashboard') window.carregarDashboard();
+                        if(target === 'historico') window.carregarHistorico();
+                    } else {
+                        filtroGeral.classList.add('hidden');
+                        filtroGastos.classList.add('hidden');
+                    }
+                }
+                if(target === 'devedores') window.carregarDevedores();
+                if(target === 'estoque') window.carregarEstoque();
+                if(target === 'clientes') window.carregarClientes();
+            });
+        });
+    }
+
+    // 4. Sidebar e Tema
+    const btnSidebar = document.getElementById('sidebar-toggle');
+    if (btnSidebar) btnSidebar.addEventListener('click', () => document.getElementById('sidebar').classList.toggle('collapsed'));
     const btnTheme = document.getElementById('theme-toggle');
     if(btnTheme) {
         if (localStorage.getItem('theme') === 'dark') { document.body.classList.add('dark-mode'); btnTheme.querySelector('i').classList.replace('fa-moon', 'fa-sun'); }
         btnTheme.onclick = (e) => { e.preventDefault(); document.body.classList.toggle('dark-mode'); localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); btnTheme.querySelector('i').classList.replace(document.body.classList.contains('dark-mode') ? 'fa-moon' : 'fa-sun', document.body.classList.contains('dark-mode') ? 'fa-sun' : 'fa-moon'); updateChartsTheme(); };
     }
-    const btnSidebar = document.getElementById('sidebar-toggle');
-    if (btnSidebar) btnSidebar.addEventListener('click', () => document.getElementById('sidebar').classList.toggle('collapsed'));
 
-    // Navegação
-    document.querySelectorAll('.menu li').forEach(item => {
-        item.addEventListener('click', () => {
-            document.querySelectorAll('.menu li').forEach(li => li.classList.remove('active'));
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            item.classList.add('active');
-            const target = item.getAttribute('data-target');
-            document.getElementById(target).classList.add('active');
-            
-            const filtroGeral = document.getElementById('filtro-periodo-geral');
-            const filtroGastos = document.getElementById('filtro-mes-gastos');
-            if (target === 'gastos') { filtroGeral.classList.add('hidden'); filtroGastos.classList.remove('hidden'); carregarGastos(); }
-            else if (target === 'dashboard' || target === 'historico') { filtroGeral.classList.remove('hidden'); filtroGastos.classList.add('hidden'); if(target==='dashboard') carregarDashboard(); else carregarHistorico(); }
-            else { filtroGeral.classList.add('hidden'); filtroGastos.classList.add('hidden'); }
-
-            if(target === 'devedores') carregarDevedores();
-            if(target === 'estoque') carregarEstoque();
-            if(target === 'clientes') carregarClientes();
-        });
-    });
-
-    // Listeners Formulários
-    document.getElementById('form-produto')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const nomeInput = document.getElementById('prod-nome').value.trim();
-        const categoria = document.getElementById('prod-categoria').value;
-        const custo = parseFloat(document.getElementById('prod-custo').value);
-        const venda = parseFloat(document.getElementById('prod-venda').value);
-        const qtdInput = document.getElementById('prod-qtd').value.replace(',', '.');
-        const qtd = parseFloat(qtdInput);
-        const margem = parseFloat(document.getElementById('prod-margem').value) || 0;
-        window.mostrarLoading(true);
-        try {
-            if(margem > 0) { const qCat = query(collection(db, COLECAO_CATEGORIAS), where("nome", "==", categoria)); const snapCat = await getDocs(qCat); if(!snapCat.empty) await updateDoc(doc(db, COLECAO_CATEGORIAS, snapCat.docs[0].id), { margem: margem }); }
-            const q = query(collection(db, COLECAO_PRODUTOS), where("nome", "==", nomeInput));
-            const sn = await getDocs(q);
-            if (!sn.empty) { const p = sn.docs[0]; await updateDoc(doc(db, COLECAO_PRODUTOS, p.id), { qtd: p.data().qtd + qtd, custo, venda, categoria }); window.mostrarAlerta("Sucesso", "Estoque somado!", "success"); } 
-            else { await addDoc(collection(db, COLECAO_PRODUTOS), { nome: nomeInput, categoria, custo, venda, qtd, ativo: true, criadoEm: Timestamp.now() }); window.mostrarAlerta("Sucesso", "Produto cadastrado!", "success"); }
-            document.getElementById('form-produto').reset(); await carregarEstoque(); window.verificarEstoqueBaixo(false);
-        } catch (e) { console.error(e); } finally { window.mostrarLoading(false); }
-    });
-
-    document.getElementById('form-cliente')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        window.mostrarLoading(true);
-        await addDoc(collection(db, COLECAO_CLIENTES), { nome: document.getElementById('cli-nome').value.toUpperCase(), tel: document.getElementById('cli-tel').value, cpf: document.getElementById('cli-cpf').value, endereco: document.getElementById('cli-endereco').value });
-        window.mostrarLoading(false);
-        document.getElementById('form-cliente').reset();
-        carregarClientes();
-        window.mostrarAlerta("Sucesso", "Cliente Salvo!", "success");
-    });
-
-    document.getElementById('form-gasto')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const nome = document.getElementById('gasto-nome').value;
-        const valor = parseFloat(document.getElementById('gasto-valor').value);
-        const dtEntrada = new Date(document.getElementById('gasto-data-entrada').value + 'T12:00:00');
-        const dtVenc = document.getElementById('gasto-data-vencimento').value;
-        const status = document.getElementById('gasto-status').value;
-        let metodo = null; let banco = null;
-        if(status === 'pago') { metodo = document.getElementById('gasto-metodo').value; banco = document.getElementById('gasto-banco').value; if(!banco) return window.mostrarAlerta("Erro", "Selecione o banco!", "error"); }
-        window.mostrarLoading(true);
-        await addDoc(collection(db, COLECAO_GASTOS), { nome, valor, status, metodo, banco, dataEntrada: Timestamp.fromDate(dtEntrada), vencimento: dtVenc });
-        window.mostrarLoading(false);
-        window.mostrarAlerta("Sucesso", "Gasto registrado!", "success");
-        document.getElementById('form-gasto').reset();
-        window.toggleCamposPagamento('gasto-status', 'container-pagamento-novo');
-        carregarGastos();
-    });
-
-    // Botões Estáticos
+    // 5. Botões Estáticos
     const btnAddCat = document.getElementById('btn-add-cat');
     if (btnAddCat) {
         btnAddCat.addEventListener('click', async () => {
@@ -480,6 +530,58 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
     }
+
+    // 6. Formulários Principais
+    document.getElementById('form-produto')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const nomeInput = document.getElementById('prod-nome').value.trim();
+        const categoria = document.getElementById('prod-categoria').value;
+        const custo = parseFloat(document.getElementById('prod-custo').value);
+        const venda = parseFloat(document.getElementById('prod-venda').value);
+        const qtdInput = document.getElementById('prod-qtd').value.replace(',', '.');
+        const qtd = parseFloat(qtdInput);
+        const margem = parseFloat(document.getElementById('prod-margem').value) || 0;
+        
+        window.mostrarLoading(true);
+        try {
+            if(margem > 0) { const qCat = query(collection(db, COLECAO_CATEGORIAS), where("nome", "==", categoria)); const snapCat = await getDocs(qCat); if(!snapCat.empty) await updateDoc(doc(db, COLECAO_CATEGORIAS, snapCat.docs[0].id), { margem: margem }); }
+            const q = query(collection(db, COLECAO_PRODUTOS), where("nome", "==", nomeInput));
+            const sn = await getDocs(q);
+            if (!sn.empty) { const p = sn.docs[0]; await updateDoc(doc(db, COLECAO_PRODUTOS, p.id), { qtd: p.data().qtd + qtd, custo, venda, categoria }); window.mostrarAlerta("Sucesso", "Estoque somado!", "success"); } 
+            else { await addDoc(collection(db, COLECAO_PRODUTOS), { nome: nomeInput, categoria, custo, venda, qtd, ativo: true, criadoEm: Timestamp.now() }); window.mostrarAlerta("Sucesso", "Produto cadastrado!", "success"); }
+            document.getElementById('form-produto').reset(); 
+            await window.carregarEstoque();
+            window.verificarEstoqueBaixo(false);
+        } catch (e) { console.error(e); } finally { window.mostrarLoading(false); }
+    });
+
+    document.getElementById('form-cliente')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        window.mostrarLoading(true);
+        await addDoc(collection(db, COLECAO_CLIENTES), { nome: document.getElementById('cli-nome').value.toUpperCase(), tel: document.getElementById('cli-tel').value, cpf: document.getElementById('cli-cpf').value, endereco: document.getElementById('cli-endereco').value });
+        window.mostrarLoading(false);
+        document.getElementById('form-cliente').reset();
+        window.carregarClientes();
+        window.mostrarAlerta("Sucesso", "Cliente Salvo!", "success");
+    });
+
+    document.getElementById('form-gasto')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const nome = document.getElementById('gasto-nome').value;
+        const valor = parseFloat(document.getElementById('gasto-valor').value);
+        const dtEntrada = new Date(document.getElementById('gasto-data-entrada').value + 'T12:00:00');
+        const dtVenc = document.getElementById('gasto-data-vencimento').value;
+        const status = document.getElementById('gasto-status').value;
+        let metodo = null; let banco = null;
+        if(status === 'pago') { metodo = document.getElementById('gasto-metodo').value; banco = document.getElementById('gasto-banco').value; if(!banco) return window.mostrarAlerta("Erro", "Selecione o banco!", "error"); }
+        window.mostrarLoading(true);
+        await addDoc(collection(db, COLECAO_GASTOS), { nome, valor, status, metodo, banco, dataEntrada: Timestamp.fromDate(dtEntrada), vencimento: dtVenc });
+        window.mostrarLoading(false);
+        window.mostrarAlerta("Sucesso", "Gasto registrado!", "success");
+        document.getElementById('form-gasto').reset();
+        window.toggleCamposPagamento('gasto-status', 'container-pagamento-novo');
+        window.carregarGastos();
+    });
 });
 
 // ============================================================
@@ -505,14 +607,14 @@ function iniciarApp() {
         carregarCategorias(),
         carregarEstoque().then(() => window.verificarEstoqueBaixo(false)),
         carregarClientes(),
-        carregarDashboard(),
-        carregarGastos(),
-        carregarBancos()
+        window.carregarDashboard(),
+        window.carregarGastos(),
+        window.carregarBancos()
     ]).catch(console.error);
 }
 
 // ============================================================
-// 7. FUNÇÕES EXPORTADAS (MÉTODOS, CARRINHO, ETC)
+// 7. FUNÇÕES EXPORTADAS
 // ============================================================
 window.carregarMetodosPagamento = async () => {
     const selects = [document.getElementById('venda-metodo'), document.getElementById('gasto-metodo'), document.getElementById('abatimento-metodo'), document.getElementById('edit-metodo'), document.getElementById('edit-gasto-metodo')];
@@ -545,8 +647,13 @@ window.adicionarAoCarrinho = () => {
 };
 
 function renderizarCarrinho() {
-    const tbody = document.querySelector('#tabela-carrinho tbody'); if(!tbody) return; tbody.innerHTML = ''; let totalGeral = 0;
-    carrinho.forEach((item, index) => { totalGeral += item.total; tbody.innerHTML += `<tr><td>${item.nome}</td><td>${item.qtd}</td><td>R$ ${item.unit.toFixed(2)}</td><td>R$ ${item.total.toFixed(2)}</td><td><button onclick="window.removerDoCarrinho(${index})" style="color:red;border:none;background:none;cursor:pointer"><i class="fas fa-trash"></i></button></td></tr>`; });
+    const tbody = document.querySelector('#tabela-carrinho tbody'); if(!tbody) return; 
+    let html = ''; let totalGeral = 0;
+    carrinho.forEach((item, index) => { 
+        totalGeral += item.total; 
+        html += `<tr><td>${item.nome}</td><td>${item.qtd}</td><td>R$ ${item.unit.toFixed(2)}</td><td>R$ ${item.total.toFixed(2)}</td><td><button onclick="window.removerDoCarrinho(${index})" style="color:red;border:none;background:none;cursor:pointer"><i class="fas fa-trash"></i></button></td></tr>`; 
+    });
+    tbody.innerHTML = html;
     const totalEl = document.getElementById('venda-total-carrinho'); if(totalEl) totalEl.innerText = `R$ ${totalGeral.toFixed(2)}`;
 }
 window.removerDoCarrinho = (index) => { carrinho.splice(index, 1); renderizarCarrinho(); };
@@ -617,6 +724,7 @@ window.importarDadosBackup = async (i) => {
                 let batch = writeBatch(db);
                 let count = 0;
                 const commitBatch = async () => { await batch.commit(); batch = writeBatch(db); count = 0; };
+                
                 if(d.produtos) for(const x of d.produtos) { if(x.criadoEm) x.criadoEm = Timestamp.fromDate(new Date(x.criadoEm)); batch.set(doc(collection(db,COLECAO_PRODUTOS)),x); count++; if(count>=400) await commitBatch(); }
                 if(d.clientes) for(const x of d.clientes) { batch.set(doc(collection(db,COLECAO_CLIENTES)),x); count++; if(count>=400) await commitBatch(); }
                 if(d.vendas) for(const x of d.vendas) { if(x.data) x.data = Timestamp.fromDate(new Date(x.data)); batch.set(doc(collection(db,COLECAO_VENDAS)),x); count++; if(count>=400) await commitBatch(); }
@@ -632,16 +740,6 @@ window.importarDadosBackup = async (i) => {
         r.readAsText(f);
     });
 };
-
-function configurarCheckboxes(m,c,b,cnt){
-    const master=document.getElementById(m);
-    const checks=document.querySelectorAll('.'+c);
-    const bar=document.getElementById(b);
-    if(!master)return;
-    master.onclick=()=>{checks.forEach(k=>k.checked=master.checked);up();};
-    checks.forEach(k=>k.onclick=()=>{if(!k.checked)master.checked=false;up();});
-    function up(){const n=document.querySelectorAll('.'+c+':checked').length;if(n>0)bar.classList.remove('hidden');else bar.classList.add('hidden');}
-}
 
 window.abrirRelatorioMensal = () => { document.getElementById('modal-relatorio').classList.remove('hidden'); window.gerarGraficoRelatorio(); };
 window.gerarGraficoRelatorio = async () => {
@@ -663,29 +761,29 @@ window.gerarGraficoRelatorio = async () => {
 
 window.fecharModalEdicao = () => document.getElementById('modal-editar').classList.add('hidden');
 window.abrirModalAbatimento = (n) => { document.getElementById('abatimento-cliente').value = n; document.getElementById('abatimento-cliente-nome').innerText = n; document.getElementById('abatimento-valor').value = ''; document.getElementById('modal-abatimento').classList.remove('hidden'); document.getElementById('abatimento-valor').focus(); };
-window.verDetalhesDevedor = async (n) => { const m = document.getElementById('modal-devedor'); const tb = document.querySelector('#tabela-detalhes-devedor tbody'); tb.innerHTML = '<tr><td>...</td></tr>'; m.classList.remove('hidden'); document.getElementById('titulo-devedor').innerText = `Extrato: ${n}`; const s = await getDocs(query(collection(db, COLECAO_VENDAS), where("cliente", "==", n), where("pago", "==", false))); let vs = []; s.forEach(d => vs.push(d.data())); vs.sort((a, b) => b.data.seconds - a.data.seconds); let h = ''; let t = 0; vs.forEach(v => { t += v.total; const pg = v.total < 0; h += `<tr style="${pg ? 'background:#f0fdf4' : ''}"><td>${v.data?.toDate ? v.data.toDate().toLocaleDateString('pt-BR') : '-'}</td><td>${v.produtoNome}</td><td style="${pg ? 'color:green' : ''}">R$ ${Math.abs(v.total).toFixed(2)}</td></tr>`; }); tb.innerHTML = h; document.getElementById('total-divida-modal').innerText = `R$ ${t.toFixed(2)}`; };
-window.salvarAbatimento = async () => { const n = document.getElementById('abatimento-cliente').value; const v = parseFloat(document.getElementById('abatimento-valor').value); const m = document.getElementById('abatimento-metodo').value; if (!v || v <= 0) return window.mostrarAlerta("Erro", "Valor inválido.", "error"); window.mostrarLoading(true); try { await addDoc(collection(db, COLECAO_VENDAS), { cliente: n, produtoNome: "PAGAMENTO DÍVIDA", total: -v, metodo: m, pago: false, qtd: 1, data: Timestamp.now() }); const q = query(collection(db, COLECAO_VENDAS), where("cliente", "==", n), where("pago", "==", false)); const snap = await getDocs(q); let saldo = 0; const list = []; snap.forEach(d => { saldo += d.data().total; list.push(d.ref); }); if (saldo <= 0.01) { const b = writeBatch(db); list.forEach(r => b.update(r, { pago: true })); await b.commit(); window.mostrarAlerta("Sucesso", `Dívida de ${n} quitada!`, "success"); } else { window.mostrarAlerta("Sucesso", `Pago R$ ${v}. Resta R$ ${saldo.toFixed(2)}`, "success"); } document.getElementById('modal-abatimento').classList.add('hidden'); carregarDevedores(); } catch (e) { console.error(e); } finally { window.mostrarLoading(false); } };
+window.verDetalhesDevedor = async (n) => { const m = document.getElementById('modal-devedor'); const tb = document.querySelector('#tabela-detalhes-devedor tbody'); tb.innerHTML = '<tr><td>...</td></tr>'; m.classList.remove('hidden'); document.getElementById('titulo-devedor').innerText = `Extrato: ${n}`; const s = await getDocs(query(collection(db, COLECAO_VENDAS), where("cliente", "==", n), where("pago", "==", false))); let vs = []; s.forEach(d => vs.push(d.data())); vs.sort((a, b) => b.data.seconds - a.data.seconds); let html = ''; let t = 0; vs.forEach(v => { t += v.total; const pg = v.total < 0; html += `<tr style="${pg ? 'background:#f0fdf4' : ''}"><td>${v.data?.toDate ? v.data.toDate().toLocaleDateString('pt-BR') : '-'}</td><td>${v.produtoNome}</td><td style="${pg ? 'color:green' : ''}">R$ ${Math.abs(v.total).toFixed(2)}</td></tr>`; }); tb.innerHTML = html; document.getElementById('total-divida-modal').innerText = `R$ ${t.toFixed(2)}`; };
+window.salvarAbatimento = async () => { const n = document.getElementById('abatimento-cliente').value; const v = parseFloat(document.getElementById('abatimento-valor').value); const m = document.getElementById('abatimento-metodo').value; if (!v || v <= 0) return window.mostrarAlerta("Erro", "Valor inválido.", "error"); window.mostrarLoading(true); try { await addDoc(collection(db, COLECAO_VENDAS), { cliente: n, produtoNome: "PAGAMENTO DÍVIDA", total: -v, metodo: m, pago: false, qtd: 1, data: Timestamp.now() }); const q = query(collection(db, COLECAO_VENDAS), where("cliente", "==", n), where("pago", "==", false)); const snap = await getDocs(q); let saldo = 0; const list = []; snap.forEach(d => { saldo += d.data().total; list.push(d.ref); }); if (saldo <= 0.01) { const b = writeBatch(db); list.forEach(r => b.update(r, { pago: true })); await b.commit(); window.mostrarAlerta("Sucesso", `Dívida de ${n} quitada!`, "success"); } else { window.mostrarAlerta("Sucesso", `Pago R$ ${v}. Resta R$ ${saldo.toFixed(2)}`, "success"); } document.getElementById('modal-abatimento').classList.add('hidden'); window.carregarDevedores(); } catch (e) { console.error(e); } finally { window.mostrarLoading(false); } };
 window.filtrarEstoque = () => { const t = document.getElementById('busca-estoque').value.toLowerCase(); document.querySelectorAll('#tabela-estoque tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
 window.filtrarHistorico = () => { const t = document.getElementById('busca-historico').value.toLowerCase(); document.querySelectorAll('#tabela-historico tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
 window.filtrarClientes = () => { const t = document.getElementById('busca-clientes').value.toLowerCase(); document.querySelectorAll('#tabela-clientes tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
 window.filtrarDevedores = () => { const t = document.getElementById('busca-devedores').value.toLowerCase(); document.querySelectorAll('#tabela-devedores tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
-window.excluirMassaClientes=async()=>{const c=document.querySelectorAll('.cli-checkbox:checked');if(c.length===0)return;window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} clientes?`, async()=>{window.mostrarLoading(true);for(const x of c)await deleteDoc(doc(db,COLECAO_CLIENTES,x.value));window.mostrarLoading(false);carregarClientes();});};
-window.excluirCliente=async(id)=>{window.mostrarConfirmacao("Apagar?", "Excluir cliente?", async()=>{await deleteDoc(doc(db,COLECAO_CLIENTES,id));carregarClientes();});};
-window.excluirMassa=async()=>{const c=document.querySelectorAll('.sale-checkbox:checked');if(c.length===0)return;window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} registros?`, async()=>{window.mostrarLoading(true);for(const x of c){try{await deleteDoc(doc(db,COLECAO_VENDAS,x.value));const pid=x.dataset.pid;const q=parseInt(x.dataset.qtd);if(pid&&pid.length>10&&!isNaN(q))await updateDoc(doc(db,COLECAO_PRODUTOS,pid),{qtd:increment(q)});}catch(e){}}window.mostrarLoading(false);carregarHistorico();});};
+window.excluirMassaClientes=async()=>{const c=document.querySelectorAll('.cli-checkbox:checked');if(c.length===0)return;window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} clientes?`, async()=>{window.mostrarLoading(true);for(const x of c)await deleteDoc(doc(db,COLECAO_CLIENTES,x.value));window.mostrarLoading(false);window.carregarClientes();});};
+window.excluirCliente=async(id)=>{window.mostrarConfirmacao("Apagar?", "Excluir cliente?", async()=>{await deleteDoc(doc(db,COLECAO_CLIENTES,id));window.carregarClientes();});};
+window.excluirMassa=async()=>{const c=document.querySelectorAll('.sale-checkbox:checked');if(c.length===0)return;window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} registros?`, async()=>{window.mostrarLoading(true);for(const x of c){try{await deleteDoc(doc(db,COLECAO_VENDAS,x.value));const pid=x.dataset.pid;const q=parseInt(x.dataset.qtd);if(pid&&pid.length>10&&!isNaN(q))await updateDoc(doc(db,COLECAO_PRODUTOS,pid),{qtd:increment(q)});}catch(e){}}window.mostrarLoading(false);window.carregarHistorico();});};
 window.abrirEdicao=(id,v,m)=>{document.getElementById('edit-id').value=id;document.getElementById('edit-valor').value=v;document.getElementById('edit-metodo').value=m;document.getElementById('modal-editar').classList.remove('hidden');};
-window.salvarEdicaoVenda=async()=>{const id=document.getElementById('edit-id').value;const m=document.getElementById('edit-metodo').value;const valor=parseFloat(document.getElementById('edit-valor').value);const isAbatimento=valor<0;const isPago=isAbatimento?false:(m!=='aver');await updateDoc(doc(db,COLECAO_VENDAS,id),{total:valor,metodo:m,pago:isPago});window.fecharModalEdicao();carregarHistorico();};
-window.excluirMassaDevedores=async()=>{const c=document.querySelectorAll('.dev-checkbox:checked');if(c.length===0)return;window.mostrarConfirmacao("Perdoar?", `Zerar ${c.length} clientes?`, async()=>{window.mostrarLoading(true);for(const x of c){const n=x.value;const s=await getDocs(query(collection(db,COLECAO_VENDAS),where("cliente","==",n),where("pago","==",false)));s.forEach(async d=>await deleteDoc(doc(db,COLECAO_VENDAS,d.id)));}window.mostrarLoading(false);window.mostrarAlerta("Sucesso","Dívidas perdoadas!","success");carregarDevedores();});};
+window.salvarEdicaoVenda=async()=>{const id=document.getElementById('edit-id').value;const m=document.getElementById('edit-metodo').value;const valor=parseFloat(document.getElementById('edit-valor').value);const isAbatimento=valor<0;const isPago=isAbatimento?false:(m!=='aver');await updateDoc(doc(db,COLECAO_VENDAS,id),{total:valor,metodo:m,pago:isPago});window.fecharModalEdicao();window.carregarHistorico();};
+window.excluirMassaDevedores=async()=>{const c=document.querySelectorAll('.dev-checkbox:checked');if(c.length===0)return;window.mostrarConfirmacao("Perdoar?", `Zerar ${c.length} clientes?`, async()=>{window.mostrarLoading(true);for(const x of c){const n=x.value;const s=await getDocs(query(collection(db,COLECAO_VENDAS),where("cliente","==",n),where("pago","==",false)));s.forEach(async d=>await deleteDoc(doc(db,COLECAO_VENDAS,d.id)));}window.mostrarLoading(false);window.mostrarAlerta("Sucesso","Dívidas perdoadas!","success");window.carregarDevedores();});};
 window.abrirModalBancos = () => document.getElementById('modal-bancos').classList.remove('hidden');
-window.adicionarBanco = async () => { const n = document.getElementById('novo-banco-nome').value.trim(); if(n) { await addDoc(collection(db, COLECAO_BANCOS), { nome: n }); document.getElementById('novo-banco-nome').value = ''; carregarBancos(); } };
-window.removerBanco = async (id) => { window.mostrarConfirmacao("Excluir Banco?", "Essa ação não pode ser desfeita.", async () => { await deleteDoc(doc(db, COLECAO_BANCOS, id)); carregarBancos(); }); };
+window.adicionarBanco = async () => { const n = document.getElementById('novo-banco-nome').value.trim(); if(n) { await addDoc(collection(db, COLECAO_BANCOS), { nome: n }); document.getElementById('novo-banco-nome').value = ''; window.carregarBancos(); } };
+window.removerBanco = async (id) => { window.mostrarConfirmacao("Excluir Banco?", "Essa ação não pode ser desfeita.", async () => { await deleteDoc(doc(db, COLECAO_BANCOS, id)); window.carregarBancos(); }); };
 window.toggleCamposPagamento = (idSelect, idContainer) => {
     const status = document.getElementById(idSelect).value;
     const container = document.getElementById(idContainer);
     if(status === 'pago') container.classList.remove('hidden');
     else container.classList.add('hidden');
 };
-window.excluirGasto = async (id) => { window.mostrarConfirmacao("Excluir?", "Deseja remover essa despesa?", async () => { await deleteDoc(doc(db, COLECAO_GASTOS, id)); carregarGastos(); }); };
-window.excluirMassaGastos = async () => { const c = document.querySelectorAll('.gasto-checkbox:checked'); if(c.length === 0) return; window.mostrarConfirmacao("Excluir em Massa", `Apagar ${c.length} despesas?`, async () => { window.mostrarLoading(true); for(const x of c) { try { await deleteDoc(doc(db, COLECAO_GASTOS, x.value)); } catch(e) {} } window.mostrarLoading(false); carregarGastos(); }); };
+window.excluirGasto = async (id) => { window.mostrarConfirmacao("Excluir?", "Deseja remover essa despesa?", async () => { await deleteDoc(doc(db, COLECAO_GASTOS, id)); window.carregarGastos(); }); };
+window.excluirMassaGastos = async () => { const c = document.querySelectorAll('.gasto-checkbox:checked'); if(c.length === 0) return; window.mostrarConfirmacao("Excluir em Massa", `Apagar ${c.length} despesas?`, async () => { window.mostrarLoading(true); for(const x of c) { try { await deleteDoc(doc(db, COLECAO_GASTOS, x.value)); } catch(e) {} } window.mostrarLoading(false); window.carregarGastos(); }); };
 window.abrirEditarGasto = async (id) => {
     const docSnap = await getDoc(doc(db, COLECAO_GASTOS, id));
     if (docSnap.exists()) {
@@ -714,11 +812,11 @@ window.salvarEdicaoGasto = async () => {
     await updateDoc(doc(db, COLECAO_GASTOS, id), { nome, valor, status, metodo, banco, dataEntrada: Timestamp.fromDate(dtEntrada), vencimento: dtVenc });
     window.mostrarLoading(false);
     document.getElementById('modal-gasto-edit').classList.add('hidden');
-    carregarGastos();
+    window.carregarGastos();
 };
-window.excluirMassaEstoque = async () => { const c = document.querySelectorAll('.stock-checkbox:checked'); if(c.length===0) return; window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} produtos?`, async () => { window.mostrarLoading(true); for(const x of c) await deleteDoc(doc(db, COLECAO_PRODUTOS, x.value)); window.mostrarLoading(false); carregarEstoque(); }); };
-window.excluirProduto = async (id) => { window.mostrarConfirmacao("Excluir?", "Apagar produto?", async () => { await deleteDoc(doc(db, COLECAO_PRODUTOS, id)); carregarEstoque(); }); };
+window.excluirMassaEstoque = async () => { const c = document.querySelectorAll('.stock-checkbox:checked'); if(c.length===0) return; window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} produtos?`, async () => { window.mostrarLoading(true); for(const x of c) await deleteDoc(doc(db, COLECAO_PRODUTOS, x.value)); window.mostrarLoading(false); window.carregarEstoque(); }); };
+window.excluirProduto = async (id) => { window.mostrarConfirmacao("Excluir?", "Apagar produto?", async () => { await deleteDoc(doc(db, COLECAO_PRODUTOS, id)); window.carregarEstoque(); }); };
 window.abrirEditarProduto = async (id) => { const p = produtosCache.find(x => x.id === id); if(p) { document.getElementById('edit-prod-id').value = id; document.getElementById('edit-prod-nome').value = p.nome; document.getElementById('edit-prod-custo').value = p.custo; document.getElementById('edit-prod-venda').value = p.venda; document.getElementById('edit-prod-qtd').value = p.qtd; document.getElementById('modal-prod').classList.remove('hidden'); } };
-window.salvarEdicaoProduto = async () => { const id = document.getElementById('edit-prod-id').value; window.mostrarLoading(true); await updateDoc(doc(db, COLECAO_PRODUTOS, id), { nome: document.getElementById('edit-prod-nome').value, custo: parseFloat(document.getElementById('edit-prod-custo').value), venda: parseFloat(document.getElementById('edit-prod-venda').value), qtd: parseFloat(document.getElementById('edit-prod-qtd').value) }); window.mostrarLoading(false); document.getElementById('modal-prod').classList.add('hidden'); carregarEstoque(); };
+window.salvarEdicaoProduto = async () => { const id = document.getElementById('edit-prod-id').value; window.mostrarLoading(true); await updateDoc(doc(db, COLECAO_PRODUTOS, id), { nome: document.getElementById('edit-prod-nome').value, custo: parseFloat(document.getElementById('edit-prod-custo').value), venda: parseFloat(document.getElementById('edit-prod-venda').value), qtd: parseFloat(document.getElementById('edit-prod-qtd').value) }); window.mostrarLoading(false); document.getElementById('modal-prod').classList.add('hidden'); window.carregarEstoque(); };
 window.abrirEditarCliente = async (id) => { let c = clientesCache.find(x => x.id === id); if(c){ document.getElementById('edit-cli-id').value = id; document.getElementById('edit-cli-nome').value = c.nome; document.getElementById('edit-cli-tel').value = c.tel || ''; document.getElementById('edit-cli-cpf').value = c.cpf || ''; document.getElementById('edit-cli-endereco').value = c.endereco || ''; document.getElementById('modal-cliente-edit').classList.remove('hidden'); } };
-window.salvarEdicaoCliente = async () => { const id = document.getElementById('edit-cli-id').value; window.mostrarLoading(true); await updateDoc(doc(db, COLECAO_CLIENTES, id), { nome: document.getElementById('edit-cli-nome').value.toUpperCase(), tel: document.getElementById('edit-cli-tel').value, cpf: document.getElementById('edit-cli-cpf').value, endereco: document.getElementById('edit-cli-endereco').value }); window.mostrarLoading(false); document.getElementById('modal-cliente-edit').classList.add('hidden'); carregarClientes(); };
+window.salvarEdicaoCliente = async () => { const id = document.getElementById('edit-cli-id').value; window.mostrarLoading(true); await updateDoc(doc(db, COLECAO_CLIENTES, id), { nome: document.getElementById('edit-cli-nome').value.toUpperCase(), tel: document.getElementById('edit-cli-tel').value, cpf: document.getElementById('edit-cli-cpf').value, endereco: document.getElementById('edit-cli-endereco').value }); window.mostrarLoading(false); document.getElementById('modal-cliente-edit').classList.add('hidden'); window.carregarClientes(); };
