@@ -151,11 +151,16 @@
                 <div style="text-align: right; margin: 10px 0;">
                     <button onclick="window.abrirRelatorioMensal()" class="btn-primary" style="background: #8b5cf6;"><i class="fas fa-chart-pie"></i> Relatório Top Vendas</button>
                 </div>
-                <div class="form-row">
-                    <div class="card chart-container" style="flex:1"><div class="chart-header"><h3>Vendas x Custos</h3></div><div class="canvas-wrapper"><canvas id="mainChart"></canvas></div></div>
-                    <div class="card chart-container" style="flex:1"><div class="chart-header"><h3>Evolução Diária</h3></div><div class="canvas-wrapper"><canvas id="dailyChart"></canvas></div></div>
+                
+                <div class="card chart-container" style="height: 500px; margin-bottom: 20px;">
+                    <div class="chart-header">
+                        <h3>Detalhamento de Vendas (Produto x Dia)</h3>
+                    </div>
+                    <div class="canvas-wrapper">
+                        <canvas id="stackedProductChart"></canvas>
+                    </div>
                 </div>
-            </section>
+                </section>
 
             <section id="vendas" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
