@@ -733,23 +733,61 @@ document.getElementById('venda-produto')?.addEventListener('input', function() {
 
 window.finalizarVendaCarrinho = async () => {
     if(carrinho.length === 0) return window.mostrarAlerta("Erro", "Carrinho vazio!", "error");
+    
     const metodo = document.getElementById('venda-metodo').value;
     const cliente = document.getElementById('venda-cliente').value;
     const dataVenda = document.getElementById('venda-data').value;
-    if(metodo === 'aver' && (!cliente || cliente === 'Consumidor Final')) return window.mostrarAlerta("Erro", "Fiado exige cliente!", "error");
+    
+    if(metodo === 'aver' && (!cliente || cliente === 'Consumidor Final')) 
+        return window.mostrarAlerta("Erro", "Fiado exige cliente!", "error");
+    
+    // Pergunta se deseja imprimir a nota antes de salvar
+    const desejaImprimir = confirm("Venda registrada! Deseja imprimir a Nota de Venda?");
+    
     window.mostrarLoading(true);
-    const batch = writeBatch(db); const dataFinal = new Date(dataVenda + 'T12:00:00');
+    const batch = writeBatch(db); 
+    const dataFinal = new Date(dataVenda + 'T12:00:00');
+    
+    // Guarda cópia do carrinho para impressão (pois vamos limpar a variável global depois)
+    const itensParaImpressao = [...carrinho]; 
+    const idVendaGeral = doc(collection(db, COLECAO_VENDAS)).id; // Gera um ID para usar na nota
+
     try {
         for (const item of carrinho) {
-            const vendaRef = doc(collection(db, COLECAO_VENDAS));
-            batch.set(vendaRef, { produtoId: item.id, produtoNome: item.nome, qtd: item.qtd, total: item.total, custo: (item.custo||0)*item.qtd, metodo: metodo, cliente: cliente, pago: metodo !== 'aver', data: Timestamp.fromDate(dataFinal) });
+            const vendaRef = doc(collection(db, COLECAO_VENDAS)); // Novo doc para cada item (como é sua estrutura atual)
+            batch.set(vendaRef, { 
+                idVendaAgrupada: idVendaGeral, // Vincula itens a uma mesma "nota"
+                produtoId: item.id, 
+                produtoNome: item.nome, 
+                qtd: item.qtd, 
+                total: item.total, 
+                custo: (item.custo||0)*item.qtd, 
+                metodo: metodo, 
+                cliente: cliente, 
+                pago: metodo !== 'aver', 
+                data: Timestamp.fromDate(dataFinal) 
+            });
             const prodRef = doc(db, COLECAO_PRODUTOS, item.id);
             batch.update(prodRef, { qtd: increment(-item.qtd) });
         }
         await batch.commit();
-        window.mostrarLoading(false); window.mostrarAlerta("Sucesso", "Venda Finalizada!", "success");
-        carrinho = []; renderizarCarrinho(); carregarEstoque();
-    } catch (e) { console.error(e); window.mostrarLoading(false); window.mostrarAlerta("Erro", "Falha ao finalizar.", "error"); }
+        
+        window.mostrarLoading(false); 
+        window.mostrarAlerta("Sucesso", "Venda Finalizada!", "success");
+
+        // CHAMA A IMPRESSÃO SE O USUÁRIO CONFIRMOU
+        if (desejaImprimir) {
+            window.imprimirNota({ id: idVendaGeral, cliente: cliente, data: dataFinal }, itensParaImpressao);
+        }
+
+        carrinho = []; 
+        renderizarCarrinho(); 
+        carregarEstoque();
+    } catch (e) { 
+        console.error(e); 
+        window.mostrarLoading(false); 
+        window.mostrarAlerta("Erro", "Falha ao finalizar.", "error"); 
+    }
 };
 
 window.exportarDadosBackup = async () => {
@@ -886,6 +924,193 @@ window.salvarEdicaoGasto = async () => {
     document.getElementById('modal-gasto-edit').classList.add('hidden');
     window.carregarGastos();
 };
+
+// --- FUNÇÃO DE IMPRESSÃO DA NOTA DE VENDA ---
+window.imprimirNota = async (venda, itensCarrinho) => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Configurações visuais
+    const corBorda = '#000000';
+    const larguraPagina = 210; // A4
+    const margemEsq = 10;
+    
+    // --- CABEÇALHO ---
+    // Retângulo Principal do Cabeçalho
+    doc.setDrawColor(0);
+    doc.rect(10, 10, 190, 35); // Borda externa topo
+
+    // Divisórias verticais do cabeçalho
+    doc.line(70, 10, 70, 45); // Separa Logo/Dados
+    doc.line(160, 10, 160, 45); // Separa Dados/Nota
+
+    // 1. Área da Empresa (Centro)
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("NUTRIFORTE", 115, 18, { align: "center" });
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("RUA SILVIO SANTOS, 398 - AMARALINA", 115, 24, { align: "center" });
+    doc.text("BOM JESUS DA LAPA - BA - CEP: 47600000", 115, 29, { align: "center" });
+    doc.text("TEL.: (77) 9191 - 1821", 115, 34, { align: "center" });
+
+   doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Nota de Venda", 180, 16, { align: "center" }); // Centralizado em 180
+    
+    // Número da Venda
+    const idCurto = venda.id ? venda.id.substring(0, 8).toUpperCase() : "NOVO";
+    doc.text(`VN-${idCurto}`, 180, 22, { align: "center" }); // Centralizado em 180
+
+    doc.line(160, 25, 200, 25); // Linha divisória horizontal
+
+    // DADOS MENORES (Data, Página, Empresa)
+    doc.setFontSize(7); // Reduzi de 8 para 7 para garantir que caiba
+    doc.setFont("helvetica", "normal");
+    
+    const dataHoje = new Date().toLocaleDateString('pt-BR');
+    const horaHoje = new Date().toLocaleTimeString('pt-BR');
+    
+    // Centralizando tudo em X = 180 (meio do quadro da direita)
+    doc.text(`Emissão: ${dataHoje} ${horaHoje}`, 180, 29, { align: "center" });
+    doc.text(`Página: 1 de 1`, 180, 33, { align: "center" });
+    
+    // Para o nome da empresa, se for muito grande, usamos splitTextToSize ou apenas centralizamos
+    // Vou colocar centralizado, que resolve para "NUTRIFORTE RACOES"
+    doc.text(`EMP.: NUTRIFORTE RACOES`, 180, 37, { align: "center" });
+
+    // --- DADOS DO CLIENTE ---
+    const startYCliente = 50;
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(`FANTASIA: ${venda.cliente}`, 10, startYCliente);
+    doc.text(`R.SOCIAL: ${venda.cliente}`, 130, startYCliente);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text("Endereço não informado", 10, startYCliente + 5);
+    doc.text("COMPLEMENTO:", 130, startYCliente + 5);
+    
+    doc.text("CPF/CNPJ: null", 10, startYCliente + 10);
+    doc.text("BAIRRO:", 80, startYCliente + 10);
+    doc.text("CIDADE: Bom Jesus da Lapa", 130, startYCliente + 10);
+
+    doc.setFont("helvetica", "bold");
+    doc.text(`DATA: ${dataHoje}`, 190, startYCliente + 18, { align: "right" });
+
+    // --- TABELA DE ITENS ---
+    // Prepara os dados para a tabela
+    const colunas = ["REF", "DESCRIÇÃO", "UND", "QTDE", "PREÇO", "DESC.", "TOTAL"];
+    const linhas = itensCarrinho.map((item, index) => [
+        (index + 1).toString().padStart(3, '0'), // REF simples
+        item.nome.toUpperCase(),
+        "UN", // Unidade padrão (pode ajustar se tiver no cadastro)
+        item.qtd.toString(),
+        item.unit.toFixed(2).replace('.', ','),
+        "0,00",
+        item.total.toFixed(2).replace('.', ',')
+    ]);
+
+    doc.autoTable({
+        startY: 75,
+        head: [colunas],
+        body: linhas,
+        theme: 'plain', // Tema simples para parecer nota fiscal
+        styles: { 
+            fontSize: 9, 
+            cellPadding: 2, 
+            lineColor: [200, 200, 200], 
+            lineWidth: 0.1 
+        },
+        headStyles: { 
+            fontStyle: 'bold', 
+            fillColor: [255, 255, 255], 
+            textColor: 0, 
+            lineColor: 0, 
+            lineWidth: 0.1,
+            border: 'bottom' // Apenas borda inferior no cabeçalho
+        },
+        columnStyles: {
+            0: { cellWidth: 15 }, // REF
+            1: { cellWidth: 'auto' }, // DESCRIÇÃO
+            2: { cellWidth: 15 }, // UND
+            3: { cellWidth: 15, halign: 'center' }, // QTDE
+            4: { cellWidth: 25, halign: 'right' }, // PREÇO
+            5: { cellWidth: 20, halign: 'right' }, // DESC
+            6: { cellWidth: 25, halign: 'right' }  // TOTAL
+        },
+        margin: { left: 10, right: 10 }
+    });
+
+    // --- RODAPÉ DA NOTA (TOTALIZADORES E ASSINATURAS) ---
+    // Pegar a posição Y onde a tabela terminou
+    let finalY = doc.lastAutoTable.finalY + 10;
+    
+    // Garante que o rodapé fique na parte inferior se a nota for pequena, 
+    // ou logo após a tabela se for grande (mas cuidado com quebra de página)
+    if (finalY < 220) finalY = 220; 
+
+    doc.setDrawColor(0);
+    doc.line(10, finalY, 200, finalY); // Linha separadora superior do rodapé
+
+    // Bloco Esquerdo (Assinaturas)
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Resp. / Vendedor: ADMINISTRADOR`, 12, finalY + 5);
+    
+    doc.text("Data Recebimento: _____/_____/_______", 12, finalY + 12);
+    
+    doc.text("Aceite do Cliente:", 12, finalY + 19);
+    doc.line(40, finalY + 19, 110, finalY + 19); // Linha para assinatura
+    
+    doc.setFontSize(9);
+    doc.text("AJUSTE DE ESTOQUE", 60, finalY + 24, { align: "center" });
+
+    // Bloco Direito (Totais)
+    // Linhas verticais do bloco de totais
+    doc.line(115, finalY, 115, finalY + 25); 
+    doc.line(150, finalY, 150, finalY + 25); 
+    
+    // Qtde e Volumes
+    doc.setFont("helvetica", "bold");
+    doc.text("Qtde", 117, finalY + 5);
+    doc.setFont("helvetica", "normal");
+    doc.text(itensCarrinho.length.toString(), 145, finalY + 5, { align: "right" });
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Volumes", 117, finalY + 23);
+    doc.text("_______", 145, finalY + 23, { align: "right" });
+
+    // Valores Monetários
+    const totalGeral = itensCarrinho.reduce((acc, item) => acc + item.total, 0);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Total da Nota:", 152, finalY + 5);
+    doc.text(`R$ ${totalGeral.toFixed(2).replace('.', ',')}`, 198, finalY + 5, { align: "right" });
+    
+    doc.text("Desconto:", 152, finalY + 10);
+    doc.text("R$ 0,00", 198, finalY + 10, { align: "right" });
+
+    doc.setFontSize(10);
+    doc.text("Total a Pagar:", 152, finalY + 23);
+    doc.text(`R$ ${totalGeral.toFixed(2).replace('.', ',')}`, 198, finalY + 23, { align: "right" });
+
+    doc.line(10, finalY + 25, 200, finalY + 25); // Linha final
+
+    // Rodapézinho (Prazo e valor)
+    doc.setFontSize(7);
+    doc.text("PRAZO / 1", 12, finalY + 30);
+    const dataVenc = new Date();
+    dataVenc.setDate(dataVenc.getDate() + 30);
+    doc.text(`A Pagar ${dataVenc.toLocaleDateString('pt-BR')}`, 60, finalY + 30);
+    doc.text(`R$ ${totalGeral.toFixed(2).replace('.', ',')}`, 120, finalY + 30);
+
+    // Abrir PDF em nova aba ou baixar
+    // doc.save(`Nota_${idCurto}.pdf`); // Para baixar direto
+    window.open(doc.output('bloburl'), '_blank'); // Para abrir em nova aba e imprimir
+};
+
 window.excluirMassaEstoque = async () => { const c = document.querySelectorAll('.stock-checkbox:checked'); if(c.length===0) return; window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} produtos?`, async () => { window.mostrarLoading(true); for(const x of c) await deleteDoc(doc(db, COLECAO_PRODUTOS, x.value)); window.mostrarLoading(false); window.carregarEstoque(); }); };
 window.excluirProduto = async (id) => { window.mostrarConfirmacao("Excluir?", "Apagar produto?", async () => { await deleteDoc(doc(db, COLECAO_PRODUTOS, id)); window.carregarEstoque(); }); };
 window.abrirEditarProduto = async (id) => { const p = produtosCache.find(x => x.id === id); if(p) { document.getElementById('edit-prod-id').value = id; document.getElementById('edit-prod-nome').value = p.nome; document.getElementById('edit-prod-custo').value = p.custo; document.getElementById('edit-prod-venda').value = p.venda; document.getElementById('edit-prod-qtd').value = p.qtd; document.getElementById('modal-prod').classList.remove('hidden'); } };
