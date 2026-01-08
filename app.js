@@ -364,7 +364,7 @@ function renderizarTabelaHistorico() {
     configurarCheckboxes('select-all','sale-checkbox','bulk-actions',null);
 }
 
-// --- DASHBOARD (NOVA VERSÃO - GRÁFICO EMPILHADO) ---
+// --- DASHBOARD (ATUALIZADO - TOTAL DIÁRIO) ---
 async function carregarDashboard() {
     const i = new Date(document.getElementById('data-inicio').value + 'T00:00:00'); 
     const f = new Date(document.getElementById('data-fim').value + 'T23:59:59');
@@ -377,8 +377,8 @@ async function carregarDashboard() {
     
     let fat = 0, custo = 0, gastos = 0;
     
-    const mapVendasDiaProduto = {}; 
-    const setProdutosNoPeriodo = new Set();
+    // Objeto para agregar o total por dia
+    const mapVendasDia = {}; 
 
     sv.forEach(d => { 
         const v = d.data(); 
@@ -386,13 +386,9 @@ async function carregarDashboard() {
             fat += v.total; 
             custo += v.custo || 0; 
             
-            const dia = v.data.toDate().toLocaleDateString('pt-BR').slice(0, 5); // Pega dd/mm
-            if (!mapVendasDiaProduto[dia]) mapVendasDiaProduto[dia] = {};
-            
-            if (!mapVendasDiaProduto[dia][v.produtoNome]) mapVendasDiaProduto[dia][v.produtoNome] = 0;
-            
-            mapVendasDiaProduto[dia][v.produtoNome] += v.total;
-            setProdutosNoPeriodo.add(v.produtoNome);
+            // Agrega valor no dia
+            const dia = v.data.toDate().toLocaleDateString('pt-BR').slice(0, 5); // dd/mm
+            mapVendasDia[dia] = (mapVendasDia[dia] || 0) + v.total;
         } 
     });
     
@@ -407,85 +403,62 @@ async function carregarDashboard() {
     document.getElementById('kpi-gastos').innerText = `R$ ${gastos.toFixed(2)}`; 
     document.getElementById('kpi-lucro').innerText = `R$ ${(fat-custo-gastos).toFixed(2)}`;
     
-    // Chama renderização do novo gráfico
-    renderStackedProductChart(mapVendasDiaProduto, Array.from(setProdutosNoPeriodo));
+    // Chama renderização do novo gráfico simples
+    renderDailySalesChart(mapVendasDia);
 }
 window.carregarDashboard = carregarDashboard;
 
-// Nova Função de Renderização do Gráfico Empilhado
-function renderStackedProductChart(dadosMap, listaProdutos) {
-    const ctx = document.getElementById('stackedProductChart'); 
+// Nova Função para Gráfico de Vendas Totais por Dia
+function renderDailySalesChart(dadosMap) {
+    const ctx = document.getElementById('dailySalesChart'); 
     if(!ctx) return;
     
     if(chartInstance) chartInstance.destroy();
 
+    // Ordena as datas (eixo X)
     const labelsDias = Object.keys(dadosMap).sort((a, b) => {
         const [d1, m1] = a.split('/').map(Number);
         const [d2, m2] = b.split('/').map(Number);
         return (m1 - m2) || (d1 - d2);
     });
 
-    const datasets = listaProdutos.map((produto) => {
-        const dataValues = labelsDias.map(dia => dadosMap[dia][produto] || 0);
-        return {
-            label: produto,
-            data: dataValues,
-            backgroundColor: gerarCorAleatoria(produto),
-            stack: 'Stack 0',
-        };
-    });
+    const dataValues = labelsDias.map(dia => dadosMap[dia]);
 
     chartInstance = new Chart(ctx.getContext('2d'), { 
         type: 'bar', 
         data: { 
             labels: labelsDias, 
-            datasets: datasets 
+            datasets: [{
+                label: 'Total Vendido',
+                data: dataValues,
+                backgroundColor: '#4F46E5',
+                borderRadius: 4
+            }]
         }, 
         options: { 
             responsive: true, 
             maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
             scales: {
-                x: { stacked: true },
-                y: { stacked: true, beginAtZero: true }
+                y: { beginAtZero: true }
             },
             plugins: {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            // CORREÇÃO: Verifica se o valor é válido e maior que zero
-                            // Se for 0, retorna null para não exibir no tooltip
-                            const val = context.parsed.y;
-                            if (val === null || val <= 0) {
-                                return null;
-                            }
-
                             let label = context.dataset.label || '';
                             if (label) {
                                 label += ': ';
                             }
-                            label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+                            if (context.parsed.y !== null) {
+                                label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y);
+                            }
                             return label;
                         }
                     }
-                },
-                // Opcional: Se a legenda estiver muito poluída, você pode descomentar abaixo para ocultar:
-                // legend: { display: false } 
+                }
             }
         } 
     }); 
-}
-
-function gerarCorAleatoria(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const h = Math.abs(hash % 360);
-    return `hsl(${h}, 70%, 60%)`;
 }
 
 function renderGastosCharts(statusData, metodoData, evolucaoData) {
