@@ -55,6 +55,7 @@ let historicoCache = [];
 let devedoresCache = [];
 
 let carrinho = [];
+let pagamentosVenda = [];
 let filtroCategoriaEstoque = "TODOS";
 let ordenacaoAtual = { coluna: null, direcao: 'asc' };
 
@@ -727,46 +728,151 @@ function renderizarCarrinho() {
     });
     tbody.innerHTML = html;
     const totalEl = document.getElementById('venda-total-carrinho'); if(totalEl) totalEl.innerText = `R$ ${totalGeral.toFixed(2)}`;
+
+    if(window.atualizarInfoPagamento) window.atualizarInfoPagamento();
 }
 window.removerDoCarrinho = (index) => { carrinho.splice(index, 1); renderizarCarrinho(); };
 document.getElementById('venda-produto')?.addEventListener('input', function() { const p = produtosCache.find(x => x.nome === this.value); if(p) document.getElementById('venda-valor-unit').value = p.venda.toFixed(2); });
 
+// --- FUNÇÕES DE PAGAMENTO MÚLTIPLO ---
+
+window.atualizarInfoPagamento = () => {
+    const totalCarrinho = carrinho.reduce((acc, item) => acc + item.total, 0);
+    const totalPago = pagamentosVenda.reduce((acc, pg) => acc + pg.valor, 0);
+    const restante = totalCarrinho - totalPago;
+
+    // Atualiza a lista visual
+    const ul = document.getElementById('lista-pagamentos-venda');
+    if (ul) {
+        ul.innerHTML = '';
+        pagamentosVenda.forEach((pg, index) => {
+            ul.innerHTML += `
+                <li style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding:2px 0;">
+                    <span>${pg.metodo}: R$ ${pg.valor.toFixed(2)}</span>
+                    <button onclick="window.removerPagamentoParcial(${index})" style="color:red; border:none; background:none; cursor:pointer;">&times;</button>
+                </li>`;
+        });
+    }
+
+    // Atualiza label de restante
+    const elRestante = document.getElementById('label-restante');
+    const inputParcial = document.getElementById('valor-pagamento-parcial');
+    
+    if (elRestante) {
+        if (restante > 0.01) {
+            elRestante.innerText = `Falta: R$ ${restante.toFixed(2)}`;
+            elRestante.style.color = '#ef4444'; // Vermelho
+            if(inputParcial) inputParcial.value = restante.toFixed(2); // Sugere o valor restante
+        } else if (restante < -0.01) {
+            elRestante.innerText = `Troco: R$ ${Math.abs(restante).toFixed(2)}`;
+            elRestante.style.color = '#10b981'; // Verde
+            if(inputParcial) inputParcial.value = '';
+        } else {
+            elRestante.innerText = 'Total Coberto ✅';
+            elRestante.style.color = '#10b981';
+            if(inputParcial) inputParcial.value = '';
+        }
+    }
+};
+
+window.adicionarPagamentoParcial = () => {
+    const select = document.getElementById('venda-metodo');
+    const inputVal = document.getElementById('valor-pagamento-parcial');
+    
+    const metodo = select.options[select.selectedIndex].text; // Pega o texto (ex: Pix) em vez do value (ex: pix) para ficar bonito
+    const metodoValue = select.value;
+    let valor = parseFloat(inputVal.value);
+
+    // Se o usuário não digitou valor, tenta pegar o total do carrinho (comportamento padrão antigo)
+    if (isNaN(valor) || valor <= 0) {
+        const totalCarrinho = carrinho.reduce((acc, item) => acc + item.total, 0);
+        const totalPago = pagamentosVenda.reduce((acc, pg) => acc + pg.valor, 0);
+        valor = totalCarrinho - totalPago;
+    }
+
+    if (valor <= 0) return window.mostrarAlerta("Aviso", "Valor inválido ou total já pago.");
+
+    pagamentosVenda.push({ metodo: metodo, metodoValue: metodoValue, valor: valor });
+    window.atualizarInfoPagamento();
+};
+
+window.removerPagamentoParcial = (index) => {
+    pagamentosVenda.splice(index, 1);
+    window.atualizarInfoPagamento();
+};
+
 window.finalizarVendaCarrinho = async () => {
     if(carrinho.length === 0) return window.mostrarAlerta("Erro", "Carrinho vazio!", "error");
     
-    const metodo = document.getElementById('venda-metodo').value;
+    const totalCarrinho = carrinho.reduce((acc, item) => acc + item.total, 0);
+    let pagamentosFinais = [...pagamentosVenda];
+    let metodoString = "";
+
+    // LÓGICA DE PAGAMENTO
+    if (pagamentosFinais.length === 0) {
+        // Modo Simples: Usuário não adicionou parciais, usa o select para o valor total
+        const metodoSelect = document.getElementById('venda-metodo');
+        const metodoNome = metodoSelect.options[metodoSelect.selectedIndex].text;
+        const metodoVal = metodoSelect.value;
+        
+        pagamentosFinais.push({ metodo: metodoNome, metodoValue: metodoVal, valor: totalCarrinho });
+        metodoString = metodoVal; // Mantém compatibilidade (ex: "pix")
+    } else {
+        // Modo Múltiplo: Valida se o total bate
+        const totalPago = pagamentosFinais.reduce((acc, pg) => acc + pg.valor, 0);
+        
+        // Aceita uma margem de erro de 0.01 centavo
+        if (Math.abs(totalPago - totalCarrinho) > 0.05) {
+            return window.mostrarAlerta("Erro", `Pagamento diverge do total! Pago: ${totalPago.toFixed(2)} | Total: ${totalCarrinho.toFixed(2)}`, "error");
+        }
+        
+        // Cria uma string combinada, ex: "Dinheiro + Pix"
+        metodoString = pagamentosFinais.map(p => p.metodo).join(" + ");
+    }
+
     const cliente = document.getElementById('venda-cliente').value;
     const dataVenda = document.getElementById('venda-data').value;
     
-    if(metodo === 'aver' && (!cliente || cliente === 'Consumidor Final')) 
-        return window.mostrarAlerta("Erro", "Fiado exige cliente!", "error");
-    
-    // Pergunta se deseja imprimir a nota antes de salvar
+    // Verifica Fiado
+    const temFiado = pagamentosFinais.some(p => p.metodoValue === 'aver');
+    if(temFiado && (!cliente || cliente === 'Consumidor Final')) 
+        return window.mostrarAlerta("Erro", "Fiado exige cliente identificado!", "error");
+
+    // Pergunta impressão
     const desejaImprimir = confirm("Venda registrada! Deseja imprimir a Nota de Venda?");
     
     window.mostrarLoading(true);
     const batch = writeBatch(db); 
     const dataFinal = new Date(dataVenda + 'T12:00:00');
-    
-    // Guarda cópia do carrinho para impressão (pois vamos limpar a variável global depois)
     const itensParaImpressao = [...carrinho]; 
-    const idVendaGeral = doc(collection(db, COLECAO_VENDAS)).id; // Gera um ID para usar na nota
+    const idVendaGeral = doc(collection(db, COLECAO_VENDAS)).id;
 
     try {
         for (const item of carrinho) {
-            const vendaRef = doc(collection(db, COLECAO_VENDAS)); // Novo doc para cada item (como é sua estrutura atual)
+            const vendaRef = doc(collection(db, COLECAO_VENDAS));
+            
+            // Define status de pagamento deste item
+            // Se houve pagamento misto, marcamos como pago (exceto se TUDO for fiado, mas aqui simplificamos)
+            // Se quiser precisão no fiado misto, teria que salvar quanto foi fiado.
+            // Para simplificar: Se tem "aver" na lista, o status 'pago' geral fica false ou salvamos true e gerenciamos a divida separada.
+            // Lógica atual mantida: Se o método principal for 'aver', pago = false.
+            // Com múltiplos, se houver 'aver', consideramos que gerou dívida.
+            const isFiado = pagamentosFinais.some(p => p.metodoValue === 'aver');
+
             batch.set(vendaRef, { 
-                idVendaAgrupada: idVendaGeral, // Vincula itens a uma mesma "nota"
+                idVendaAgrupada: idVendaGeral,
                 produtoId: item.id, 
                 produtoNome: item.nome, 
                 qtd: item.qtd, 
                 total: item.total, 
                 custo: (item.custo||0)*item.qtd, 
-                metodo: metodo, 
+                metodo: metodoString, // String combinada (ex: "Pix + Dinheiro")
+                detalhesPagamento: pagamentosFinais, // Salva o array detalhado para futuro
                 cliente: cliente, 
-                pago: metodo !== 'aver', 
+                pago: !isFiado, 
                 data: Timestamp.fromDate(dataFinal) 
             });
+            
             const prodRef = doc(db, COLECAO_PRODUTOS, item.id);
             batch.update(prodRef, { qtd: increment(-item.qtd) });
         }
@@ -775,12 +881,15 @@ window.finalizarVendaCarrinho = async () => {
         window.mostrarLoading(false); 
         window.mostrarAlerta("Sucesso", "Venda Finalizada!", "success");
 
-        // CHAMA A IMPRESSÃO SE O USUÁRIO CONFIRMOU
         if (desejaImprimir) {
-            window.imprimirNota({ id: idVendaGeral, cliente: cliente, data: dataFinal }, itensParaImpressao);
+            // Passamos o metodoString para sair na nota "Pix + Dinheiro"
+            window.imprimirNota({ id: idVendaGeral, cliente: cliente, data: dataFinal, metodo: metodoString }, itensParaImpressao);
         }
 
+        // Reseta tudo
         carrinho = []; 
+        pagamentosVenda = []; // Limpa pagamentos
+        window.atualizarInfoPagamento(); // Limpa UI
         renderizarCarrinho(); 
         carregarEstoque();
     } catch (e) { 
