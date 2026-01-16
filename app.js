@@ -604,28 +604,96 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 6. Formulários Principais
+    // 1. EVENTO DE AUTOPREENCHIMENTO (Ao digitar o nome do produto)
+    document.getElementById('prod-nome')?.addEventListener('input', function() {
+        const nomeDigitado = this.value.trim().toLowerCase();
+        
+        // Procura no cache (ignora maiúsculas/minúsculas)
+        const produtoEncontrado = produtosCache.find(p => p.nome.toLowerCase() === nomeDigitado);
+        
+        if (produtoEncontrado) {
+            // Preenche os campos se achou o produto
+            document.getElementById('prod-categoria').value = produtoEncontrado.categoria || '';
+            document.getElementById('prod-custo').value = produtoEncontrado.custo;
+            document.getElementById('prod-venda').value = produtoEncontrado.venda;
+            
+            // Calcula e mostra a margem (visual)
+            if(produtoEncontrado.custo > 0) {
+                const margem = ((produtoEncontrado.venda - produtoEncontrado.custo) / produtoEncontrado.custo) * 100;
+                const campoMargem = document.getElementById('prod-margem');
+                if(campoMargem) campoMargem.value = margem.toFixed(0);
+            }
+        }
+    });
+
+    // 2. EVENTO DE SALVAR (SOMA AO ESTOQUE OU CRIA NOVO)
     document.getElementById('form-produto')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        
         const nomeInput = document.getElementById('prod-nome').value.trim();
         const categoria = document.getElementById('prod-categoria').value;
         const custo = parseFloat(document.getElementById('prod-custo').value);
         const venda = parseFloat(document.getElementById('prod-venda').value);
+        
+        // Tratamento da quantidade (troca vírgula por ponto)
         const qtdInput = document.getElementById('prod-qtd').value.replace(',', '.');
         const qtd = parseFloat(qtdInput);
+        
         const margem = parseFloat(document.getElementById('prod-margem').value) || 0;
         
+        if (!nomeInput || isNaN(custo) || isNaN(venda) || isNaN(qtd)) {
+            return window.mostrarAlerta("Erro", "Preencha os campos corretamente.", "error");
+        }
+
         window.mostrarLoading(true);
         try {
-            if(margem > 0) { const qCat = query(collection(db, COLECAO_CATEGORIAS), where("nome", "==", categoria)); const snapCat = await getDocs(qCat); if(!snapCat.empty) await updateDoc(doc(db, COLECAO_CATEGORIAS, snapCat.docs[0].id), { margem: margem }); }
-            const q = query(collection(db, COLECAO_PRODUTOS), where("nome", "==", nomeInput));
-            const sn = await getDocs(q);
-            if (!sn.empty) { const p = sn.docs[0]; await updateDoc(doc(db, COLECAO_PRODUTOS, p.id), { qtd: p.data().qtd + qtd, custo, venda, categoria }); window.mostrarAlerta("Sucesso", "Estoque somado!", "success"); } 
-            else { await addDoc(collection(db, COLECAO_PRODUTOS), { nome: nomeInput, categoria, custo, venda, qtd, ativo: true, criadoEm: Timestamp.now() }); window.mostrarAlerta("Sucesso", "Produto cadastrado!", "success"); }
+            // Atualiza margem da categoria se foi alterada
+            if(margem > 0) { 
+                const qCat = query(collection(db, COLECAO_CATEGORIAS), where("nome", "==", categoria)); 
+                const snapCat = await getDocs(qCat); 
+                if(!snapCat.empty) await updateDoc(doc(db, COLECAO_CATEGORIAS, snapCat.docs[0].id), { margem: margem }); 
+            }
+
+            // BUSCA INTELIGENTE: Verifica se já existe (ignorando maiúsculas/minúsculas)
+            const produtoExistente = produtosCache.find(p => p.nome.toLowerCase() === nomeInput.toLowerCase());
+
+            if (produtoExistente) {
+                // --- CENÁRIO: PRODUTO JÁ EXISTE (SOMA AO ESTOQUE) ---
+                const produtoRef = doc(db, COLECAO_PRODUTOS, produtoExistente.id);
+                
+                await updateDoc(produtoRef, { 
+                    // 'increment(qtd)' garante a soma correta direto no banco
+                    qtd: increment(qtd), 
+                    custo: custo, 
+                    venda: venda, 
+                    categoria: categoria 
+                });
+                
+                window.mostrarAlerta("Sucesso", `Estoque de "${nomeInput}" somado (+${qtd})!`, "success"); 
+            } else { 
+                // --- CENÁRIO: PRODUTO NOVO (CRIA) ---
+                await addDoc(collection(db, COLECAO_PRODUTOS), { 
+                    nome: nomeInput, // Salva o nome como digitado (respeitando maiúsculas do input)
+                    categoria, 
+                    custo, 
+                    venda, 
+                    qtd, 
+                    ativo: true, 
+                    criadoEm: Timestamp.now() 
+                }); 
+                window.mostrarAlerta("Sucesso", "Novo produto cadastrado!", "success"); 
+            }
+
             document.getElementById('form-produto').reset(); 
-            await window.carregarEstoque();
+            await window.carregarEstoque(); // Recarrega a tabela e o cache
             window.verificarEstoqueBaixo(false);
-        } catch (e) { console.error(e); } finally { window.mostrarLoading(false); }
+            
+        } catch (e) { 
+            console.error(e); 
+            window.mostrarAlerta("Erro", "Falha ao processar produto: " + e.message, "error");
+        } finally { 
+            window.mostrarLoading(false); 
+        }
     });
 
     document.getElementById('form-cliente')?.addEventListener('submit', async (e) => {
@@ -655,6 +723,28 @@ document.addEventListener("DOMContentLoaded", () => {
         window.toggleCamposPagamento('gasto-status', 'container-pagamento-novo');
         window.carregarGastos();
     });
+});
+
+// NOVO: Preenchimento automático ao selecionar um produto existente no Estoque
+document.getElementById('prod-nome')?.addEventListener('input', function() {
+    const nomeDigitado = this.value.trim().toLowerCase();
+     
+    // Busca no cache local (insensível a maiúsculas/minúsculas)
+    const produtoEncontrado = produtosCache.find(p => p.nome.toLowerCase() === nomeDigitado);
+        
+    if (produtoEncontrado) {
+        // Preenche os campos automaticamente
+        document.getElementById('prod-categoria').value = produtoEncontrado.categoria || '';
+        document.getElementById('prod-custo').value = produtoEncontrado.custo;
+        document.getElementById('prod-venda').value = produtoEncontrado.venda;
+        
+        // Calcula a margem visualmente (opcional, já que a função calcular não estava no código enviado)
+        if(produtoEncontrado.custo > 0) {
+            const margem = ((produtoEncontrado.venda - produtoEncontrado.custo) / produtoEncontrado.custo) * 100;
+            const campoMargem = document.getElementById('prod-margem');
+            if(campoMargem) campoMargem.value = margem.toFixed(0);
+        }
+    }
 });
 
 // ============================================================
