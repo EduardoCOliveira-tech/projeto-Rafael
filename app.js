@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
        from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, doc, updateDoc, deleteDoc, increment, getDoc, writeBatch, enableIndexedDbPersistence } 
+import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, doc, updateDoc, deleteDoc, increment, getDoc, writeBatch, enableIndexedDbPersistence, startAfter } 
        from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
 // ============================================================
@@ -49,7 +49,7 @@ let produtosCache = [];
 let clientesCache = [];
 let categoriasCache = [];
 let bancosCache = [];
-let metodosCache = ["Dinheiro", "Pix", "Débito", "Crédito", "Fiado (A Ver)"];
+let metodosCache = ["Dinheiro", "Pix", "Débito", "Crédito", "Fiado"];
 let gastosCache = [];
 let historicoCache = [];
 let devedoresCache = [];
@@ -58,6 +58,11 @@ let carrinho = [];
 let pagamentosVenda = [];
 let filtroCategoriaEstoque = "TODOS";
 let ordenacaoAtual = { coluna: null, direcao: 'asc' };
+
+let isFiltroRapido = false;       // Controla se o usuário clicou nos botões de dia/semana/mês
+let histPaginaAtual = 1;          // Página atual
+let histStackDocs = [];           // Pilha para guardar onde começa/termina cada página (para poder voltar)
+let histUltimoDoc = null;         // Último documento carregado na busca atual
 
 const COLECAO_VENDAS = 'loja_vendas';
 const COLECAO_PRODUTOS = 'loja_produtos';
@@ -337,13 +342,62 @@ function renderizarTabelaDevedores() {
 
 // --- HISTÓRICO (OTIMIZADO) ---
 async function carregarHistorico() {
-    const i = new Date(document.getElementById('data-inicio').value+'T00:00:00');
-    const f = new Date(document.getElementById('data-fim').value+'T23:59:59');
-    const q = query(collection(db,COLECAO_VENDAS),where("data",">=",Timestamp.fromDate(i)),where("data","<=",Timestamp.fromDate(f)),orderBy("data","desc"),limit(100));
+    const i = new Date(document.getElementById('data-inicio').value + 'T00:00:00');
+    const f = new Date(document.getElementById('data-fim').value + 'T23:59:59');
+    
+    let q;
+
+    // --- LÓGICA DE PAGINAÇÃO ---
+    if (isFiltroRapido) {
+        // Se for filtro rápido, traz "tudo" (limite 1000 para segurança) e esconde paginação
+        document.getElementById('paginacao-historico').classList.add('hidden');
+        q = query(collection(db, COLECAO_VENDAS), 
+            where("data", ">=", Timestamp.fromDate(i)), 
+            where("data", "<=", Timestamp.fromDate(f)), 
+            orderBy("data", "desc"), 
+            limit(1000)
+        );
+    } else {
+        // Se for navegação normal, aplica paginação de 50
+        document.getElementById('paginacao-historico').classList.remove('hidden');
+        
+        let queryConstraints = [
+            collection(db, COLECAO_VENDAS),
+            where("data", ">=", Timestamp.fromDate(i)),
+            where("data", "<=", Timestamp.fromDate(f)),
+            orderBy("data", "desc"),
+            limit(50)
+        ];
+
+        // Se não for a página 1, precisamos dizer ao Firebase para começar DEPOIS do último da página anterior
+        if (histPaginaAtual > 1 && histStackDocs[histPaginaAtual - 2]) {
+            queryConstraints.push(startAfter(histStackDocs[histPaginaAtual - 2]));
+        }
+
+        q = query(...queryConstraints);
+    }
+
     const s = await getDocs(q);
     historicoCache = [];
+    
+    // Salva o último documento dessa leva para usar como cursor da próxima página
+    if (!isFiltroRapido && s.docs.length > 0) {
+        histUltimoDoc = s.docs[s.docs.length - 1];
+        histStackDocs[histPaginaAtual - 1] = histUltimoDoc;
+    }
+
     s.forEach(d => { historicoCache.push({ id: d.id, ...d.data() }); });
+    
     renderizarTabelaHistorico();
+    
+    // Atualiza o estado dos botões de paginação
+    if (!isFiltroRapido) {
+        document.getElementById('info-paginacao').innerText = `Pág. ${histPaginaAtual}`;
+        document.getElementById('btn-ant-hist').disabled = (histPaginaAtual === 1);
+        
+        // Se veio menos de 50 itens, significa que acabou a lista, desabilita o botão Próxima
+        document.getElementById('btn-prox-hist').disabled = (s.docs.length < 50);
+    }
 }
 window.carregarHistorico = carregarHistorico;
 
@@ -352,7 +406,9 @@ function renderizarTabelaHistorico() {
     if(!tbody) return;
     let htmlBuffer = '';
     historicoCache.forEach(v => {
-        const dataF = v.data && v.data.seconds ? new Date(v.data.seconds * 1000).toLocaleDateString('pt-BR') : '-';
+        // Adicionamos o 'options' para incluir a hora
+        const dataObj = v.data && v.data.seconds ? new Date(v.data.seconds * 1000) : null;
+        const dataF = dataObj ? dataObj.toLocaleDateString('pt-BR') + ' ' + dataObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}) : '-';
         let pg = v.metodo === 'aver' ? 'Fiado' : v.metodo;
         let b = v.pago ? 'badge-success' : 'badge-warning';
         let st = v.pago ? 'PAGO' : 'PENDENTE';
@@ -911,7 +967,7 @@ window.finalizarVendaCarrinho = async () => {
         // Modo Múltiplo: Valida se o total bate
         const totalPago = pagamentosFinais.reduce((acc, pg) => acc + pg.valor, 0);
         
-        // Aceita uma margem de erro de 0.01 centavo
+        // Aceita uma margem de erro de 0.05 centavos
         if (Math.abs(totalPago - totalCarrinho) > 0.05) {
             return window.mostrarAlerta("Erro", `Pagamento diverge do total! Pago: ${totalPago.toFixed(2)} | Total: ${totalCarrinho.toFixed(2)}`, "error");
         }
@@ -933,7 +989,17 @@ window.finalizarVendaCarrinho = async () => {
     
     window.mostrarLoading(true);
     const batch = writeBatch(db); 
-    const dataFinal = new Date(dataVenda + 'T12:00:00');
+    
+    // --- ALTERAÇÃO AQUI: Captura o horário atual e mistura com a data do input ---
+    let dataBase = new Date(dataVenda + 'T00:00:00');
+    const agora = new Date();
+    dataBase.setHours(agora.getHours());
+    dataBase.setMinutes(agora.getMinutes());
+    dataBase.setSeconds(agora.getSeconds());
+    
+    const dataFinal = dataBase;
+    // -----------------------------------------------------------------------------
+
     const itensParaImpressao = [...carrinho]; 
     const idVendaGeral = doc(collection(db, COLECAO_VENDAS)).id;
 
@@ -942,11 +1008,7 @@ window.finalizarVendaCarrinho = async () => {
             const vendaRef = doc(collection(db, COLECAO_VENDAS));
             
             // Define status de pagamento deste item
-            // Se houve pagamento misto, marcamos como pago (exceto se TUDO for fiado, mas aqui simplificamos)
-            // Se quiser precisão no fiado misto, teria que salvar quanto foi fiado.
-            // Para simplificar: Se tem "aver" na lista, o status 'pago' geral fica false ou salvamos true e gerenciamos a divida separada.
-            // Lógica atual mantida: Se o método principal for 'aver', pago = false.
-            // Com múltiplos, se houver 'aver', consideramos que gerou dívida.
+            // Lógica: Se tem "aver" (fiado) na lista de pagamentos, consideramos não pago inicialmente
             const isFiado = pagamentosFinais.some(p => p.metodoValue === 'aver');
 
             batch.set(vendaRef, { 
@@ -956,8 +1018,8 @@ window.finalizarVendaCarrinho = async () => {
                 qtd: item.qtd, 
                 total: item.total, 
                 custo: (item.custo||0)*item.qtd, 
-                metodo: metodoString, // String combinada (ex: "Pix + Dinheiro")
-                detalhesPagamento: pagamentosFinais, // Salva o array detalhado para futuro
+                metodo: metodoString, // String combinada
+                detalhesPagamento: pagamentosFinais, // Array detalhado
                 cliente: cliente, 
                 pago: !isFiado, 
                 data: Timestamp.fromDate(dataFinal) 
@@ -972,14 +1034,13 @@ window.finalizarVendaCarrinho = async () => {
         window.mostrarAlerta("Sucesso", "Venda Finalizada!", "success");
 
         if (desejaImprimir) {
-            // Passamos o metodoString para sair na nota "Pix + Dinheiro"
             window.imprimirNota({ id: idVendaGeral, cliente: cliente, data: dataFinal, metodo: metodoString }, itensParaImpressao);
         }
 
         // Reseta tudo
         carrinho = []; 
-        pagamentosVenda = []; // Limpa pagamentos
-        window.atualizarInfoPagamento(); // Limpa UI
+        pagamentosVenda = []; 
+        window.atualizarInfoPagamento(); 
         renderizarCarrinho(); 
         carregarEstoque();
     } catch (e) { 
@@ -1122,6 +1183,56 @@ window.salvarEdicaoGasto = async () => {
     window.mostrarLoading(false);
     document.getElementById('modal-gasto-edit').classList.add('hidden');
     window.carregarGastos();
+};
+
+// Função chamada pelos botões "Hoje", "7 Dias", "Mês"
+window.filtrarHistoricoRapido = (tipo) => {
+    isFiltroRapido = true; // Desativa a paginação (mostra tudo ou limite alto)
+    
+    const inputInicio = document.getElementById('data-inicio');
+    const inputFim = document.getElementById('data-fim');
+    const hoje = new Date();
+    
+    let dtInicio = new Date();
+    let dtFim = new Date(); 
+
+    if (tipo === 'dia') {
+        dtInicio = hoje;
+    } else if (tipo === 'semana') {
+        dtInicio.setDate(hoje.getDate() - 7);
+    } else if (tipo === 'mes') {
+        dtInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        dtFim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+    }
+
+    inputInicio.value = dtInicio.toISOString().split('T')[0];
+    inputFim.value = dtFim.toISOString().split('T')[0];
+
+    window.carregarHistorico();
+};
+
+// Função chamada pelo botão de filtro manual (ícone de funil)
+window.filtrarPorData = () => {
+    // Se o usuário clicou no filtro manual, reativamos a paginação
+    isFiltroRapido = false; 
+    
+    // Reseta controles de paginação
+    histPaginaAtual = 1;
+    histStackDocs = [];
+    
+    const activeView = document.querySelector('.view.active').id;
+    if(activeView === 'dashboard') window.carregarDashboard();
+    if(activeView === 'historico') window.carregarHistorico();
+    // Adicione outros if se precisar filtrar gastos com esse botão
+};
+
+// Função para mudar de página (Next/Prev)
+window.mudarPaginaHistorico = (delta) => {
+    const novaPagina = histPaginaAtual + delta;
+    if (novaPagina < 1) return;
+    
+    histPaginaAtual = novaPagina;
+    window.carregarHistorico();
 };
 
 // --- FUNÇÃO DE IMPRESSÃO DA NOTA DE VENDA ---

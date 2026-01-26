@@ -262,10 +262,20 @@
             <section id="historico" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h2>Histórico</h2>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <button onclick="window.filtrarHistoricoRapido('dia')" class="btn-primary" style="padding: 5px 15px; font-size: 0.9rem; background: #64748b;">Hoje</button>
+                        <button onclick="window.filtrarHistoricoRapido('semana')" class="btn-primary" style="padding: 5px 15px; font-size: 0.9rem; background: #64748b;">7 Dias</button>
+                        <button onclick="window.filtrarHistoricoRapido('mes')" class="btn-primary" style="padding: 5px 15px; font-size: 0.9rem; background: #64748b;">Este Mês</button>
+                    </div>
                     <div id="bulk-actions" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;"><button onclick="window.excluirMassa()" class="btn-icon" style="color: #dc2626;">Apagar Selecionados</button></div>
                 </div>
                 <div style="margin-bottom: 10px;"><input type="text" id="busca-historico" placeholder="🔍 Filtrar..." onkeyup="window.filtrarHistorico()" style="padding: 10px; width: 100%;"></div>
                 <div class="table-responsive"><table id="tabela-historico"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all"></th><th class="sortable" onclick="window.ordenarTabela('historico', 'data')">Data <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('historico', 'cliente')">Cliente <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('historico', 'produtoNome')">Produto <i class="fas fa-sort"></i></th><th>Qtd</th><th class="sortable" onclick="window.ordenarTabela('historico', 'total')">Valor <i class="fas fa-sort"></i></th><th>Pagamento</th><th>Status</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+                <div id="paginacao-historico" class="hidden" style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 15px;">
+                    <button onclick="window.mudarPaginaHistorico(-1)" id="btn-ant-hist" class="btn-primary" style="background: #64748b; padding: 5px 15px;" disabled><i class="fas fa-chevron-left"></i> Anterior</button>
+                    <span id="info-paginacao" style="font-weight: bold; color: var(--text-main);">Pág. 1</span>
+                    <button onclick="window.mudarPaginaHistorico(1)" id="btn-prox-hist" class="btn-primary" style="background: #64748b; padding: 5px 15px;">Próxima <i class="fas fa-chevron-right"></i></button>
+                </div>
             </section>
 
             <section id="estoque" class="view">
