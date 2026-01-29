@@ -956,41 +956,43 @@ window.finalizarVendaCarrinho = async () => {
 
     // LÓGICA DE PAGAMENTO
     if (pagamentosFinais.length === 0) {
-        // Modo Simples: Usuário não adicionou parciais, usa o select para o valor total
+        // Modo Simples
         const metodoSelect = document.getElementById('venda-metodo');
         const metodoNome = metodoSelect.options[metodoSelect.selectedIndex].text;
         const metodoVal = metodoSelect.value;
         
         pagamentosFinais.push({ metodo: metodoNome, metodoValue: metodoVal, valor: totalCarrinho });
-        metodoString = metodoVal; // Mantém compatibilidade (ex: "pix")
+        metodoString = metodoVal; 
     } else {
-        // Modo Múltiplo: Valida se o total bate
+        // Modo Múltiplo
         const totalPago = pagamentosFinais.reduce((acc, pg) => acc + pg.valor, 0);
         
-        // Aceita uma margem de erro de 0.05 centavos
         if (Math.abs(totalPago - totalCarrinho) > 0.05) {
             return window.mostrarAlerta("Erro", `Pagamento diverge do total! Pago: ${totalPago.toFixed(2)} | Total: ${totalCarrinho.toFixed(2)}`, "error");
         }
         
-        // Cria uma string combinada, ex: "Dinheiro + Pix"
         metodoString = pagamentosFinais.map(p => p.metodo).join(" + ");
     }
 
     const cliente = document.getElementById('venda-cliente').value;
     const dataVenda = document.getElementById('venda-data').value;
     
-    // Verifica Fiado
-    const temFiado = pagamentosFinais.some(p => p.metodoValue === 'aver');
+    // CALCULA QUANTO É FIADO E QUANTO FOI PAGO AGORA
+    const totalFiado = pagamentosFinais
+        .filter(p => p.metodoValue === 'aver')
+        .reduce((acc, p) => acc + p.valor, 0);
+        
+    const totalPagoAgora = totalCarrinho - totalFiado;
+    const temFiado = totalFiado > 0.01;
+
     if(temFiado && (!cliente || cliente === 'Consumidor Final')) 
         return window.mostrarAlerta("Erro", "Fiado exige cliente identificado!", "error");
 
-    // Pergunta impressão
     const desejaImprimir = confirm("Venda registrada! Deseja imprimir a Nota de Venda?");
     
     window.mostrarLoading(true);
     const batch = writeBatch(db); 
     
-    // --- ALTERAÇÃO AQUI: Captura o horário atual e mistura com a data do input ---
     let dataBase = new Date(dataVenda + 'T00:00:00');
     const agora = new Date();
     dataBase.setHours(agora.getHours());
@@ -998,19 +1000,16 @@ window.finalizarVendaCarrinho = async () => {
     dataBase.setSeconds(agora.getSeconds());
     
     const dataFinal = dataBase;
-    // -----------------------------------------------------------------------------
 
     const itensParaImpressao = [...carrinho]; 
     const idVendaGeral = doc(collection(db, COLECAO_VENDAS)).id;
 
     try {
+        // 1. SALVA OS PRODUTOS
+        // Se tem fiado, salvamos como NÃO PAGO inicialmente para registrar o débito total
         for (const item of carrinho) {
             const vendaRef = doc(collection(db, COLECAO_VENDAS));
             
-            // Define status de pagamento deste item
-            // Lógica: Se tem "aver" (fiado) na lista de pagamentos, consideramos não pago inicialmente
-            const isFiado = pagamentosFinais.some(p => p.metodoValue === 'aver');
-
             batch.set(vendaRef, { 
                 idVendaAgrupada: idVendaGeral,
                 produtoId: item.id, 
@@ -1018,16 +1017,43 @@ window.finalizarVendaCarrinho = async () => {
                 qtd: item.qtd, 
                 total: item.total, 
                 custo: (item.custo||0)*item.qtd, 
-                metodo: metodoString, // String combinada
-                detalhesPagamento: pagamentosFinais, // Array detalhado
+                metodo: metodoString, 
+                detalhesPagamento: pagamentosFinais, 
                 cliente: cliente, 
-                pago: !isFiado, 
+                pago: !temFiado, // Se tem fiado, marca false (pendente)
                 data: Timestamp.fromDate(dataFinal) 
             });
             
             const prodRef = doc(db, COLECAO_PRODUTOS, item.id);
             batch.update(prodRef, { qtd: increment(-item.qtd) });
         }
+
+        // 2. SE HOUVE PAGAMENTO PARCIAL (MISTO), CRIA O ABATIMENTO AUTOMÁTICO
+        // Isso reduz a dívida do cliente imediatamente
+        if (temFiado && totalPagoAgora > 0.01) {
+            const ajusteRef = doc(collection(db, COLECAO_VENDAS));
+            
+            // Filtra os métodos que não são fiado para registrar como foi pago essa parte
+            const metodosPagos = pagamentosFinais
+                .filter(p => p.metodoValue !== 'aver')
+                .map(p => p.metodo).join(" + ");
+
+            batch.set(ajusteRef, {
+                idVendaAgrupada: idVendaGeral,
+                produtoId: 'ajuste_auto',
+                // O nome DEVE ser exatamente este para o Dashboard ignorar na soma de vendas totais
+                // mas a lista de devedores usar para subtrair a dívida
+                produtoNome: "PAGAMENTO DÍVIDA", 
+                qtd: 1,
+                total: -totalPagoAgora, // VALOR NEGATIVO PARA ABATER
+                custo: 0,
+                metodo: metodosPagos,
+                cliente: cliente,
+                pago: false, // Mantemos false para entrar no cálculo de saldo do devedor
+                data: Timestamp.fromDate(dataFinal)
+            });
+        }
+
         await batch.commit();
         
         window.mostrarLoading(false); 
@@ -1037,7 +1063,6 @@ window.finalizarVendaCarrinho = async () => {
             window.imprimirNota({ id: idVendaGeral, cliente: cliente, data: dataFinal, metodo: metodoString }, itensParaImpressao);
         }
 
-        // Reseta tudo
         carrinho = []; 
         pagamentosVenda = []; 
         window.atualizarInfoPagamento(); 
