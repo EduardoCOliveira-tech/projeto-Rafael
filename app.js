@@ -458,7 +458,7 @@ async function carregarDashboard() {
     document.getElementById('kpi-faturamento').innerText = `R$ ${fat.toFixed(2)}`; 
     document.getElementById('kpi-fiado').innerText = `R$ ${fiadoGeral.toFixed(2)}`; 
     document.getElementById('kpi-gastos').innerText = `R$ ${gastos.toFixed(2)}`; 
-    document.getElementById('kpi-lucro').innerText = `R$ ${(fat-custo-gastos).toFixed(2)}`;
+    document.getElementById('kpi-lucro').innerText = `R$ ${(fat-gastos).toFixed(2)}`;
     
     // Chama renderização do novo gráfico simples
     renderDailySalesChart(mapVendasDia);
