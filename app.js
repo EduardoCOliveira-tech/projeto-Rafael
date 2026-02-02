@@ -1260,6 +1260,115 @@ window.mudarPaginaHistorico = (delta) => {
     window.carregarHistorico();
 };
 
+// ============================================================
+// EXPORTAÇÃO PARA EXCEL (VENDAS E GASTOS DO MÊS)
+// ============================================================
+window.exportarRelatorioExcel = async () => {
+    // 1. Identificar o mês desejado
+    // Tenta pegar do filtro de gastos, se não tiver, pega o mês atual
+    let mesInput = document.getElementById('mes-gastos').value;
+    if (!mesInput) {
+        const hoje = new Date();
+        mesInput = hoje.toISOString().slice(0, 7); // Formato YYYY-MM
+    }
+
+    const [ano, mes] = mesInput.split('-');
+    const inicio = new Date(ano, mes - 1, 1);
+    const fim = new Date(ano, mes, 0, 23, 59, 59);
+
+    window.mostrarLoading(true);
+
+    try {
+        // 2. Buscar Vendas do Mês
+        const qVendas = query(
+            collection(db, COLECAO_VENDAS),
+            where("data", ">=", Timestamp.fromDate(inicio)),
+            where("data", "<=", Timestamp.fromDate(fim)),
+            orderBy("data", "desc")
+        );
+        const snapVendas = await getDocs(qVendas);
+        
+        const dadosVendas = [];
+        snapVendas.forEach(doc => {
+            const v = doc.data();
+            // Ignorar pagamento de dívida para não duplicar no relatório de vendas reais
+            if (v.produtoNome !== "PAGAMENTO DÍVIDA") {
+                dadosVendas.push({
+                    Data: v.data ? v.data.toDate().toLocaleDateString('pt-BR') : '-',
+                    Cliente: v.cliente || 'Consumidor Final',
+                    Produto: v.produtoNome,
+                    Qtd: v.qtd,
+                    Total: v.total,
+                    Metodo: v.metodo,
+                    Status: v.pago ? 'PAGO' : 'PENDENTE'
+                });
+            }
+        });
+
+        // 3. Buscar Gastos do Mês
+        const qGastos = query(
+            collection(db, COLECAO_GASTOS),
+            where("dataEntrada", ">=", Timestamp.fromDate(inicio)),
+            where("dataEntrada", "<=", Timestamp.fromDate(fim)),
+            orderBy("dataEntrada", "desc")
+        );
+        const snapGastos = await getDocs(qGastos);
+
+        const dadosGastos = [];
+        snapGastos.forEach(doc => {
+            const g = doc.data();
+            dadosGastos.push({
+                Data: g.dataEntrada ? g.dataEntrada.toDate().toLocaleDateString('pt-BR') : '-',
+                Descricao: g.nome,
+                Valor: g.valor,
+                Categoria: g.banco || '-', // Usando Banco como categoria secundária se houver
+                Vencimento: g.vencimento ? new Date(g.vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-',
+                Status: g.status.toUpperCase()
+            });
+        });
+
+        // 4. Gerar o Arquivo Excel
+        if (typeof XLSX === 'undefined') {
+            window.mostrarLoading(false);
+            return window.mostrarAlerta("Erro", "Biblioteca Excel não carregada. Verifique o index.html", "error");
+        }
+
+        const wb = XLSX.utils.book_new();
+
+        // Aba Vendas
+        if (dadosVendas.length > 0) {
+            const wsVendas = XLSX.utils.json_to_sheet(dadosVendas);
+            // Ajustar largura das colunas
+            const wscolsVendas = [{wch:12}, {wch:25}, {wch:25}, {wch:8}, {wch:10}, {wch:15}, {wch:10}];
+            wsVendas['!cols'] = wscolsVendas;
+            XLSX.utils.book_append_sheet(wb, wsVendas, "Vendas");
+        } else {
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{Info: "Nenhuma venda neste mês"}]), "Vendas");
+        }
+
+        // Aba Gastos
+        if (dadosGastos.length > 0) {
+            const wsGastos = XLSX.utils.json_to_sheet(dadosGastos);
+            const wscolsGastos = [{wch:12}, {wch:30}, {wch:10}, {wch:15}, {wch:12}, {wch:10}];
+            wsGastos['!cols'] = wscolsGastos;
+            XLSX.utils.book_append_sheet(wb, wsGastos, "Gastos");
+        } else {
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{Info: "Nenhum gasto neste mês"}]), "Gastos");
+        }
+
+        // Download
+        XLSX.writeFile(wb, `Relatorio_Nutriforte_${mesInput}.xlsx`);
+        
+        window.mostrarAlerta("Sucesso", "Planilha gerada com sucesso!", "success");
+
+    } catch (e) {
+        console.error(e);
+        window.mostrarAlerta("Erro", "Falha ao gerar planilha.", "error");
+    } finally {
+        window.mostrarLoading(false);
+    }
+};
+
 // --- FUNÇÃO DE IMPRESSÃO DA NOTA DE VENDA ---
 window.imprimirNota = async (venda, itensCarrinho) => {
     const { jsPDF } = window.jspdf;
