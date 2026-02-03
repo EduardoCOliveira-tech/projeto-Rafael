@@ -44,6 +44,7 @@ let chartGastoStatus = null;
 let chartGastoMetodo = null;
 let chartGastoEvolucao = null;
 let chartRelatorio = null;
+let clienteVisualizando = null; // Variável para guardar quem estamos vendo
 
 let produtosCache = [];
 let clientesCache = [];
@@ -1220,7 +1221,138 @@ window.gerarGraficoRelatorio = async () => {
 
 window.fecharModalEdicao = () => document.getElementById('modal-editar').classList.add('hidden');
 window.abrirModalAbatimento = (n) => { document.getElementById('abatimento-cliente').value = n; document.getElementById('abatimento-cliente-nome').innerText = n; document.getElementById('abatimento-valor').value = ''; document.getElementById('modal-abatimento').classList.remove('hidden'); document.getElementById('abatimento-valor').focus(); };
-window.verDetalhesDevedor = async (n) => { const m = document.getElementById('modal-devedor'); const tb = document.querySelector('#tabela-detalhes-devedor tbody'); tb.innerHTML = '<tr><td>...</td></tr>'; m.classList.remove('hidden'); document.getElementById('titulo-devedor').innerText = `Extrato: ${n}`; const s = await getDocs(query(collection(db, COLECAO_VENDAS), where("cliente", "==", n), where("pago", "==", false))); let vs = []; s.forEach(d => vs.push(d.data())); vs.sort((a, b) => b.data.seconds - a.data.seconds); let html = ''; let t = 0; vs.forEach(v => { t += v.total; const pg = v.total < 0; html += `<tr style="${pg ? 'background:#f0fdf4' : ''}"><td>${v.data?.toDate ? v.data.toDate().toLocaleDateString('pt-BR') : '-'}</td><td>${v.produtoNome}</td><td style="${pg ? 'color:green' : ''}">R$ ${Math.abs(v.total).toFixed(2)}</td></tr>`; }); tb.innerHTML = html; document.getElementById('total-divida-modal').innerText = `R$ ${t.toFixed(2)}`; };
+window.verDetalhesDevedor = async (n) => {
+    clienteVisualizando = n; // <--- SALVA O NOME DO CLIENTE AQUI
+    
+    const m = document.getElementById('modal-devedor');
+    const tb = document.querySelector('#tabela-detalhes-devedor tbody');
+    tb.innerHTML = '<tr><td colspan="3" style="text-align:center">Carregando...</td></tr>';
+    
+    m.classList.remove('hidden');
+    document.getElementById('titulo-devedor').innerText = `Extrato: ${n}`;
+    
+    const s = await getDocs(query(collection(db, COLECAO_VENDAS), where("cliente", "==", n), where("pago", "==", false)));
+    
+    let vs = [];
+    s.forEach(d => vs.push(d.data()));
+    
+    // Ordena do mais recente para o mais antigo
+    vs.sort((a, b) => b.data.seconds - a.data.seconds);
+    
+    let html = '';
+    let t = 0;
+    
+    vs.forEach(v => {
+        t += v.total;
+        const pg = v.total < 0;
+        // Data formatada
+        const dataF = v.data?.toDate ? v.data.toDate().toLocaleDateString('pt-BR') : '-';
+        
+        html += `<tr style="${pg ? 'background:#f0fdf4' : ''}">
+            <td>${dataF}</td>
+            <td>${v.produtoNome}</td>
+            <td style="text-align:right; ${pg ? 'color:green' : ''}">R$ ${Math.abs(v.total).toFixed(2)}</td>
+        </tr>`;
+    });
+    
+    tb.innerHTML = html || '<tr><td colspan="3" style="text-align:center">Nenhum débito encontrado.</td></tr>';
+    document.getElementById('total-divida-modal').innerText = `R$ ${t.toFixed(2)}`;
+};
+window.imprimirDebitosCliente = async () => {
+    if (!clienteVisualizando) return;
+    
+    window.mostrarLoading(true);
+    
+    try {
+        // Busca os dados novamente para garantir integridade na impressão
+        const q = query(collection(db, COLECAO_VENDAS), where("cliente", "==", clienteVisualizando), where("pago", "==", false));
+        const snap = await getDocs(q);
+        
+        let itens = [];
+        snap.forEach(d => {
+            const v = d.data();
+            itens.push({
+                data: v.data.toDate(),
+                descricao: v.produtoNome,
+                valor: v.total
+            });
+        });
+
+        // Ordena por data (Antigo -> Novo fica melhor em extrato impresso, mas pode manter desc se preferir)
+        itens.sort((a, b) => a.data - b.data); 
+
+        // GERAÇÃO DO PDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // --- CABEÇALHO ---
+        doc.setDrawColor(0);
+        doc.rect(10, 10, 190, 25); 
+
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("NUTRIFORTE", 105, 18, { align: "center" });
+        
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text("Extrato de Conta / Fiado", 105, 24, { align: "center" });
+        
+        const hoje = new Date().toLocaleDateString('pt-BR');
+        doc.setFontSize(8);
+        doc.text(`Emissão: ${hoje}`, 195, 33, { align: "right" });
+
+        // --- DADOS DO CLIENTE ---
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text(`CLIENTE: ${clienteVisualizando}`, 10, 45);
+        
+        // --- TABELA ---
+        const colunas = ["DATA", "DESCRIÇÃO / PRODUTO", "VALOR (R$)"];
+        const linhas = itens.map(item => [
+            item.data.toLocaleDateString('pt-BR'),
+            item.descricao.toUpperCase(),
+            item.valor.toFixed(2).replace('.', ',')
+        ]);
+
+        doc.autoTable({
+            startY: 50,
+            head: [colunas],
+            body: linhas,
+            theme: 'grid',
+            styles: { fontSize: 10, cellPadding: 3 },
+            headStyles: { fillColor: [79, 70, 229], textColor: 255 }, // Cor roxa do sistema
+            columnStyles: {
+                0: { cellWidth: 30, halign: 'center' },
+                1: { cellWidth: 'auto' },
+                2: { cellWidth: 40, halign: 'right' }
+            }
+        });
+
+        // --- TOTAL ---
+        const total = itens.reduce((acc, i) => acc + i.valor, 0);
+        let finalY = doc.lastAutoTable.finalY + 10;
+        
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("TOTAL A PAGAR:", 130, finalY);
+        doc.text(`R$ ${total.toFixed(2).replace('.', ',')}`, 195, finalY, { align: "right" });
+
+        // Rodapé
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.text("Reconheço a dívida acima descrita.", 10, finalY + 20);
+        doc.line(10, finalY + 35, 100, finalY + 35);
+        doc.text("Assinatura do Cliente", 10, finalY + 40);
+
+        window.open(doc.output('bloburl'), '_blank');
+        
+    } catch (e) {
+        console.error(e);
+        window.mostrarAlerta("Erro", "Falha ao gerar extrato.", "error");
+    } finally {
+        window.mostrarLoading(false);
+    }
+};
 window.salvarAbatimento = async () => { const n = document.getElementById('abatimento-cliente').value; const v = parseFloat(document.getElementById('abatimento-valor').value); const m = document.getElementById('abatimento-metodo').value; if (!v || v <= 0) return window.mostrarAlerta("Erro", "Valor inválido.", "error"); window.mostrarLoading(true); try { await addDoc(collection(db, COLECAO_VENDAS), { cliente: n, produtoNome: "PAGAMENTO DÍVIDA", total: -v, metodo: m, pago: false, qtd: 1, data: Timestamp.now() }); const q = query(collection(db, COLECAO_VENDAS), where("cliente", "==", n), where("pago", "==", false)); const snap = await getDocs(q); let saldo = 0; const list = []; snap.forEach(d => { saldo += d.data().total; list.push(d.ref); }); if (saldo <= 0.01) { const b = writeBatch(db); list.forEach(r => b.update(r, { pago: true })); await b.commit(); window.mostrarAlerta("Sucesso", `Dívida de ${n} quitada!`, "success"); } else { window.mostrarAlerta("Sucesso", `Pago R$ ${v}. Resta R$ ${saldo.toFixed(2)}`, "success"); } document.getElementById('modal-abatimento').classList.add('hidden'); window.carregarDevedores(); } catch (e) { console.error(e); } finally { window.mostrarLoading(false); } };
 window.filtrarEstoque = () => { const t = document.getElementById('busca-estoque').value.toLowerCase(); document.querySelectorAll('#tabela-estoque tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
 window.filtrarHistorico = () => { const t = document.getElementById('busca-historico').value.toLowerCase(); document.querySelectorAll('#tabela-historico tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
