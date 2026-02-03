@@ -1382,28 +1382,109 @@ window.abrirEditarGasto = async (id) => {
         document.getElementById('edit-gasto-id').value = id;
         document.getElementById('edit-gasto-nome').value = g.nome;
         document.getElementById('edit-gasto-valor').value = g.valor;
-        document.getElementById('edit-gasto-data').value = g.dataEntrada.toDate().toISOString().split('T')[0];
+        
+        // Tratamento de datas
+        if (g.dataEntrada && g.dataEntrada.toDate) {
+             document.getElementById('edit-gasto-data').value = g.dataEntrada.toDate().toISOString().split('T')[0];
+        }
         document.getElementById('edit-gasto-venc').value = g.vencimento;
+        
         document.getElementById('edit-gasto-status').value = g.status;
-        if(g.status === 'pago') { document.getElementById('edit-gasto-metodo').value = g.metodo || 'dinheiro'; document.getElementById('edit-gasto-banco').value = g.banco || ''; }
+        
+        // Reseta o campo repetir sempre que abrir a janela
+        const campoRepetir = document.getElementById('edit-gasto-repetir');
+        if(campoRepetir) campoRepetir.value = 0;
+
+        if(g.status === 'pago') { 
+            document.getElementById('edit-gasto-metodo').value = g.metodo || 'dinheiro'; 
+            document.getElementById('edit-gasto-banco').value = g.banco || ''; 
+        }
+        
         window.toggleCamposPagamento('edit-gasto-status', 'container-pagamento-edit');
         document.getElementById('modal-gasto-edit').classList.remove('hidden');
     }
 };
 window.salvarEdicaoGasto = async () => {
     const id = document.getElementById('edit-gasto-id').value;
-    const nome = document.getElementById('edit-gasto-nome').value;
+    const nomeBase = document.getElementById('edit-gasto-nome').value;
     const valor = parseFloat(document.getElementById('edit-gasto-valor').value);
-    let dtEntrada = new Date(document.getElementById('edit-gasto-data').value + 'T12:00:00');
-    const dtVenc = document.getElementById('edit-gasto-venc').value;
-    const status = document.getElementById('edit-gasto-status').value;
-    let metodo = null; let banco = null;
-    if(status === 'pago') { metodo = document.getElementById('edit-gasto-metodo').value; banco = document.getElementById('edit-gasto-banco').value; if(!banco) return window.mostrarAlerta("Erro", "Selecione o banco!", "error"); }
+    const repeticoes = parseInt(document.getElementById('edit-gasto-repetir').value) || 0;
+    
+    // Datas base (do item editado)
+    let dtEntradaBase = new Date(document.getElementById('edit-gasto-data').value + 'T12:00:00');
+    const dtVencInput = document.getElementById('edit-gasto-venc').value;
+    const dtVencBase = dtVencInput ? new Date(dtVencInput + 'T12:00:00') : null;
+    
+    const statusInicial = document.getElementById('edit-gasto-status').value;
+    let metodoInicial = null; 
+    let bancoInicial = null;
+    
+    if(statusInicial === 'pago') { 
+        metodoInicial = document.getElementById('edit-gasto-metodo').value; 
+        bancoInicial = document.getElementById('edit-gasto-banco').value; 
+        if(!bancoInicial) return window.mostrarAlerta("Erro", "Selecione o banco!", "error"); 
+    }
+    
     window.mostrarLoading(true);
-    await updateDoc(doc(db, COLECAO_GASTOS, id), { nome, valor, status, metodo, banco, dataEntrada: Timestamp.fromDate(dtEntrada), vencimento: dtVenc });
-    window.mostrarLoading(false);
-    document.getElementById('modal-gasto-edit').classList.add('hidden');
-    window.carregarGastos();
+    
+    try {
+        const batch = writeBatch(db);
+        
+        // 1. ATUALIZA O GASTO ORIGINAL (O QUE ESTÁ SENDO EDITADO)
+        const docRefOriginal = doc(db, COLECAO_GASTOS, id);
+        batch.update(docRefOriginal, { 
+            nome: nomeBase, 
+            valor: valor, 
+            status: statusInicial, 
+            metodo: metodoInicial, 
+            banco: bancoInicial, 
+            dataEntrada: Timestamp.fromDate(dtEntradaBase), 
+            vencimento: dtVencInput 
+        });
+
+        // 2. CRIA AS REPETIÇÕES (SE HOUVER)
+        // Começa de i=1 (próximo mês) até o número de repetições
+        for (let i = 1; i <= repeticoes; i++) {
+            const novoDocRef = doc(collection(db, COLECAO_GASTOS));
+            
+            // Calcula nova data de entrada
+            const novaDataEntrada = new Date(dtEntradaBase);
+            novaDataEntrada.setMonth(novaDataEntrada.getMonth() + i);
+            
+            // Calcula novo vencimento
+            let novoVencimento = null;
+            if (dtVencBase) {
+                const novaDataVenc = new Date(dtVencBase);
+                novaDataVenc.setMonth(novaDataVenc.getMonth() + i);
+                novoVencimento = novaDataVenc.toISOString().split('T')[0];
+            } else {
+                novoVencimento = novaDataEntrada.toISOString().split('T')[0];
+            }
+
+            // Repetições nascem sempre como PENDENTE, independente do original ser pago
+            batch.set(novoDocRef, {
+                nome: nomeBase,
+                valor: valor,
+                status: 'pendente',
+                metodo: null,
+                banco: null,
+                dataEntrada: Timestamp.fromDate(novaDataEntrada),
+                vencimento: novoVencimento
+            });
+        }
+
+        await batch.commit();
+        
+        window.mostrarLoading(false);
+        document.getElementById('modal-gasto-edit').classList.add('hidden');
+        window.mostrarAlerta("Sucesso", repeticoes > 0 ? "Gasto atualizado e repetições criadas!" : "Gasto atualizado!", "success");
+        window.carregarGastos();
+        
+    } catch (e) {
+        console.error(e);
+        window.mostrarLoading(false);
+        window.mostrarAlerta("Erro", "Falha ao salvar edição.", "error");
+    }
 };
 
 // Função chamada pelos botões "Hoje", "7 Dias", "Mês"
