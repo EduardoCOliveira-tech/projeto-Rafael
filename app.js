@@ -764,20 +764,84 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById('form-gasto')?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const nome = document.getElementById('gasto-nome').value;
+        
+        const nomeBase = document.getElementById('gasto-nome').value;
         const valor = parseFloat(document.getElementById('gasto-valor').value);
-        const dtEntrada = new Date(document.getElementById('gasto-data-entrada').value + 'T12:00:00');
-        const dtVenc = document.getElementById('gasto-data-vencimento').value;
-        const status = document.getElementById('gasto-status').value;
-        let metodo = null; let banco = null;
-        if(status === 'pago') { metodo = document.getElementById('gasto-metodo').value; banco = document.getElementById('gasto-banco').value; if(!banco) return window.mostrarAlerta("Erro", "Selecione o banco!", "error"); }
+        const repeticoes = parseInt(document.getElementById('gasto-repetir').value) || 0; // Pega o número de repetições
+        
+        const dtEntradaBase = new Date(document.getElementById('gasto-data-entrada').value + 'T12:00:00');
+        const dtVencInput = document.getElementById('gasto-data-vencimento').value;
+        const dtVencBase = dtVencInput ? new Date(dtVencInput + 'T12:00:00') : null;
+        
+        const statusInicial = document.getElementById('gasto-status').value;
+        let metodoInicial = null; 
+        let bancoInicial = null;
+        
+        if(statusInicial === 'pago') { 
+            metodoInicial = document.getElementById('gasto-metodo').value; 
+            bancoInicial = document.getElementById('gasto-banco').value; 
+            if(!bancoInicial) return window.mostrarAlerta("Erro", "Selecione o banco!", "error"); 
+        }
+
         window.mostrarLoading(true);
-        await addDoc(collection(db, COLECAO_GASTOS), { nome, valor, status, metodo, banco, dataEntrada: Timestamp.fromDate(dtEntrada), vencimento: dtVenc });
-        window.mostrarLoading(false);
-        window.mostrarAlerta("Sucesso", "Gasto registrado!", "success");
-        document.getElementById('form-gasto').reset();
-        window.toggleCamposPagamento('gasto-status', 'container-pagamento-novo');
-        window.carregarGastos();
+        
+        try {
+            const batch = writeBatch(db); // Prepara um pacote de gravações para ser mais rápido e seguro
+
+            // Loop para criar o gasto atual (i=0) + as repetições (i=1 até repeticoes)
+            for (let i = 0; i <= repeticoes; i++) {
+                const docRef = doc(collection(db, COLECAO_GASTOS));
+                
+                // Calcula a nova data de entrada (mês atual + i)
+                const novaDataEntrada = new Date(dtEntradaBase);
+                novaDataEntrada.setMonth(novaDataEntrada.getMonth() + i);
+
+                // Calcula a nova data de vencimento (mês atual + i)
+                let novoVencimento = null;
+                if (dtVencBase) {
+                    const novaDataVenc = new Date(dtVencBase);
+                    novaDataVenc.setMonth(novaDataVenc.getMonth() + i);
+                    novoVencimento = novaDataVenc.toISOString().split('T')[0];
+                } else {
+                    // Se não tiver vencimento, usa a data de entrada
+                    novoVencimento = novaDataEntrada.toISOString().split('T')[0];
+                }
+
+                // Lógica do Status:
+                // O primeiro (i=0) segue o que está no formulário (Pago ou Pendente).
+                // As repetições futuras (i > 0) nascem sempre como 'pendente', pois ainda não aconteceram.
+                const statusAtual = (i === 0) ? statusInicial : 'pendente';
+                const metodoAtual = (i === 0) ? metodoInicial : null;
+                const bancoAtual = (i === 0) ? bancoInicial : null;
+
+                batch.set(docRef, { 
+                    nome: nomeBase, 
+                    valor: valor, 
+                    status: statusAtual, 
+                    metodo: metodoAtual, 
+                    banco: bancoAtual, 
+                    dataEntrada: Timestamp.fromDate(novaDataEntrada), 
+                    vencimento: novoVencimento 
+                });
+            }
+
+            await batch.commit(); // Salva tudo de uma vez
+            
+            window.mostrarLoading(false);
+            window.mostrarAlerta("Sucesso", repeticoes > 0 ? "Gastos recorrentes registrados!" : "Gasto registrado!", "success");
+            
+            document.getElementById('form-gasto').reset();
+            // Reseta o campo de repetir para 0 manualmente
+            document.getElementById('gasto-repetir').value = '0'; 
+            
+            window.toggleCamposPagamento('gasto-status', 'container-pagamento-novo');
+            window.carregarGastos();
+            
+        } catch (erro) {
+            console.error(erro);
+            window.mostrarLoading(false);
+            window.mostrarAlerta("Erro", "Falha ao registrar gastos.", "error");
+        }
     });
 });
 
