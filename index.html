@@ -201,7 +201,7 @@
                                 <label>Pagamento</label>
                                 <div style="display: flex; gap: 5px; margin-bottom: 5px;">
                                     <select id="venda-metodo" style="flex: 1;"></select>
-                                    <input type="number" id="valor-pagamento-parcial" placeholder="R$" step="0.01" style="width: 80px;">
+                                    <input type="number" id="valor-pagamento-parcial" placeholder="R$" step="0.01" style="width: 80px;" onkeyup="window.calcularTrocoVisivo()">
                                     <button onclick="window.adicionarPagamentoParcial()" class="btn-primary" style="padding: 0 10px;">+</button>
                                 </div>
                                 

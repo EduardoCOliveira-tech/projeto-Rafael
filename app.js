@@ -990,20 +990,31 @@ window.adicionarPagamentoParcial = () => {
     const select = document.getElementById('venda-metodo');
     const inputVal = document.getElementById('valor-pagamento-parcial');
     
-    const metodo = select.options[select.selectedIndex].text; // Pega o texto (ex: Pix) em vez do value (ex: pix) para ficar bonito
+    const metodo = select.options[select.selectedIndex].text; 
     const metodoValue = select.value;
     let valor = parseFloat(inputVal.value);
 
-    // Se o usuário não digitou valor, tenta pegar o total do carrinho (comportamento padrão antigo)
+    // Se não digitou nada, assume que é o restante
+    const totalCarrinho = carrinho.reduce((acc, item) => acc + item.total, 0);
+    const totalPago = pagamentosVenda.reduce((acc, pg) => acc + pg.valor, 0);
+    const restante = totalCarrinho - totalPago;
+
     if (isNaN(valor) || valor <= 0) {
-        const totalCarrinho = carrinho.reduce((acc, item) => acc + item.total, 0);
-        const totalPago = pagamentosVenda.reduce((acc, pg) => acc + pg.valor, 0);
-        valor = totalCarrinho - totalPago;
+        valor = restante;
+    }
+
+    // --- LÓGICA DO TROCO ---
+    if (valor > restante) {
+        const troco = valor - restante;
+        valor = restante; // Só grava no sistema o valor exato da conta
+        window.mostrarAlerta("Troco Calculado", `Devolva R$ ${troco.toFixed(2)} de troco ao cliente.`, "success");
     }
 
     if (valor <= 0) return window.mostrarAlerta("Aviso", "Valor inválido ou total já pago.");
 
     pagamentosVenda.push({ metodo: metodo, metodoValue: metodoValue, valor: valor });
+    
+    inputVal.value = ''; // Limpa o input
     window.atualizarInfoPagamento();
 };
 
@@ -1026,6 +1037,13 @@ window.finalizarVendaCarrinho = async () => {
         const metodoNome = metodoSelect.options[metodoSelect.selectedIndex].text;
         const metodoVal = metodoSelect.value;
         
+        const inputVal = document.getElementById('valor-pagamento-parcial');
+        let valorDigitado = parseFloat(inputVal.value);
+        if (!isNaN(valorDigitado) && valorDigitado > totalCarrinho) {
+            const troco = valorDigitado - totalCarrinho;
+            alert(`ATENÇÃO: Troco a devolver ao cliente R$ ${troco.toFixed(2)}`);
+        }
+
         pagamentosFinais.push({ metodo: metodoNome, metodoValue: metodoVal, valor: totalCarrinho });
         metodoString = metodoVal; 
     } else {
@@ -1140,6 +1158,32 @@ window.finalizarVendaCarrinho = async () => {
     }
 };
 
+window.calcularTrocoVisivo = () => {
+    const inputVal = document.getElementById('valor-pagamento-parcial');
+    const elRestante = document.getElementById('label-restante');
+    if(!inputVal || !elRestante) return;
+    
+    let valorDigitado = parseFloat(inputVal.value);
+    const totalCarrinho = carrinho.reduce((acc, item) => acc + item.total, 0);
+    const totalPago = pagamentosVenda.reduce((acc, pg) => acc + pg.valor, 0);
+    const restante = totalCarrinho - totalPago;
+
+    if (!isNaN(valorDigitado) && valorDigitado > restante) {
+        const troco = valorDigitado - restante;
+        elRestante.innerText = `Troco a devolver: R$ ${troco.toFixed(2)}`;
+        elRestante.style.color = '#10b981'; // Fica verde
+    } else {
+        // Voltar ao estado normal
+        if (restante > 0.01) {
+            elRestante.innerText = `Falta: R$ ${restante.toFixed(2)}`;
+            elRestante.style.color = '#ef4444';
+        } else {
+            elRestante.innerText = 'Total Coberto ✅';
+            elRestante.style.color = '#10b981';
+        }
+    }
+};
+
 window.exportarDadosBackup = async () => {
     window.mostrarLoading(true);
     try {
@@ -1242,15 +1286,21 @@ window.verDetalhesDevedor = async (n) => {
     let html = '';
     let t = 0;
     
+    // Substitua o trecho interno do foreach para puxar a quantidade:
     vs.forEach(v => {
         t += v.total;
         const pg = v.total < 0;
-        // Data formatada
         const dataF = v.data?.toDate ? v.data.toDate().toLocaleDateString('pt-BR') : '-';
+        
+        // Mostra (x2), (x3) ao lado do nome do produto se for maior que 1
+        let produtoDisplay = v.produtoNome;
+        if (!pg && v.qtd && v.qtd > 1) {
+            produtoDisplay += ` (x${v.qtd})`;
+        }
         
         html += `<tr style="${pg ? 'background:#f0fdf4' : ''}">
             <td>${dataF}</td>
-            <td>${v.produtoNome}</td>
+            <td>${produtoDisplay}</td>
             <td style="text-align:right; ${pg ? 'color:green' : ''}">R$ ${Math.abs(v.total).toFixed(2)}</td>
         </tr>`;
     });
@@ -1274,7 +1324,8 @@ window.imprimirDebitosCliente = async () => {
             itens.push({
                 data: v.data.toDate(),
                 descricao: v.produtoNome,
-                valor: v.total
+                valor: v.total,
+                qtd: v.qtd || 1  // <--- ADICIONE ESTA LINHA AQUI
             });
         });
 
@@ -1307,10 +1358,11 @@ window.imprimirDebitosCliente = async () => {
         doc.text(`CLIENTE: ${clienteVisualizando}`, 10, 45);
         
         // --- TABELA ---
-        const colunas = ["DATA", "DESCRIÇÃO / PRODUTO", "VALOR (R$)"];
+        const colunas = ["DATA", "DESCRIÇÃO / PRODUTO", "QTD", "VALOR (R$)"];
         const linhas = itens.map(item => [
             item.data.toLocaleDateString('pt-BR'),
             item.descricao.toUpperCase(),
+            item.qtd.toString(), // <--- ADICIONAMOS O DADO AQUI
             item.valor.toFixed(2).replace('.', ',')
         ]);
 
@@ -1320,11 +1372,12 @@ window.imprimirDebitosCliente = async () => {
             body: linhas,
             theme: 'grid',
             styles: { fontSize: 10, cellPadding: 3 },
-            headStyles: { fillColor: [79, 70, 229], textColor: 255 }, // Cor roxa do sistema
+            headStyles: { fillColor: [79, 70, 229], textColor: 255 }, 
             columnStyles: {
-                0: { cellWidth: 30, halign: 'center' },
+                0: { cellWidth: 25, halign: 'center' }, // Diminuí um pouco a data para caber
                 1: { cellWidth: 'auto' },
-                2: { cellWidth: 40, halign: 'right' }
+                2: { cellWidth: 15, halign: 'center' }, // <--- CONFIGURAÇÃO DA NOVA COLUNA QTD
+                3: { cellWidth: 35, halign: 'right' }
             }
         });
 
