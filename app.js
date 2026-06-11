@@ -756,7 +756,17 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('form-cliente')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         window.mostrarLoading(true);
-        await addDoc(collection(db, COLECAO_CLIENTES), { nome: document.getElementById('cli-nome').value.toUpperCase(), tel: document.getElementById('cli-tel').value, cpf: document.getElementById('cli-cpf').value, endereco: document.getElementById('cli-endereco').value });
+        await addDoc(collection(db, COLECAO_CLIENTES), { 
+            nome: document.getElementById('cli-nome').value.toUpperCase(), 
+            tel: document.getElementById('cli-tel').value, 
+            cpf: document.getElementById('cli-cpf').value, 
+            ie: document.getElementById('cli-ie').value,
+            cep: document.getElementById('cli-cep').value,
+            endereco: document.getElementById('cli-endereco').value.toUpperCase(),
+            bairro: document.getElementById('cli-bairro').value.toUpperCase(),
+            cidade: document.getElementById('cli-cidade').value.toUpperCase(),
+            uf: document.getElementById('cli-uf').value.toUpperCase()
+        });
         window.mostrarLoading(false);
         document.getElementById('form-cliente').reset();
         window.carregarClientes();
@@ -1352,10 +1362,60 @@ window.imprimirDebitosCliente = async () => {
         doc.setFontSize(8);
         doc.text(`Emissão: ${hoje}`, 195, 33, { align: "right" });
 
-        // --- DADOS DO CLIENTE ---
-        doc.setFontSize(11);
+        // --- QUADRO PADRÃO: DESTINATÁRIO / REMETENTE ---
+        let c = clientesCache.find(x => x.nome === clienteVisualizando);
+        let n_nome = c?.nome || clienteVisualizando || "";
+        let n_cpf = c?.cpf || ""; let n_ie = c?.ie || ""; let n_end = c?.endereco || "";
+        let n_bairro = c?.bairro || ""; let n_cep = c?.cep || ""; let n_cid = c?.cidade || "";
+        let n_uf = c?.uf || ""; let n_fone = c?.tel || "";
+
+        const boxY = 40; 
+        doc.setDrawColor(0);
+        doc.setFontSize(7);
         doc.setFont("helvetica", "bold");
-        doc.text(`CLIENTE: ${clienteVisualizando}`, 10, 45);
+        doc.text("DESTINATÁRIO / REMETENTE", 10, boxY - 2);
+
+        doc.rect(10, boxY, 190, 24); 
+        doc.line(10, boxY + 8, 200, boxY + 8); 
+        doc.line(10, boxY + 16, 200, boxY + 16); 
+
+        doc.line(140, boxY, 140, boxY + 8); 
+        doc.line(175, boxY, 175, boxY + 8); 
+        doc.line(110, boxY + 8, 110, boxY + 16); 
+        doc.line(160, boxY + 8, 160, boxY + 16); 
+        doc.line(90, boxY + 16, 90, boxY + 24); 
+        doc.line(130, boxY + 16, 130, boxY + 24); 
+        doc.line(145, boxY + 16, 145, boxY + 24); 
+
+        doc.setFontSize(5);
+        doc.setFont("helvetica", "normal");
+        doc.text("NOME / RAZÃO SOCIAL", 11, boxY + 3);
+        doc.text("CNPJ / CPF", 141, boxY + 3);
+        doc.text("DATA DA EMISSÃO", 176, boxY + 3);
+
+        doc.text("ENDEREÇO", 11, boxY + 11);
+        doc.text("BAIRRO / DISTRITO", 111, boxY + 11);
+        doc.text("CEP", 161, boxY + 11);
+
+        doc.text("MUNICÍPIO", 11, boxY + 19);
+        doc.text("FONE / FAX", 91, boxY + 19);
+        doc.text("UF", 131, boxY + 19);
+        doc.text("INSCRIÇÃO ESTADUAL", 146, boxY + 19);
+
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.text(n_nome, 11, boxY + 7);
+        doc.text(n_cpf, 141, boxY + 7);
+        doc.text(hoje, 176, boxY + 7);
+
+        doc.text(doc.splitTextToSize(n_end, 95), 11, boxY + 15);
+        doc.text(doc.splitTextToSize(n_bairro, 45), 111, boxY + 15);
+        doc.text(n_cep, 161, boxY + 15);
+
+        doc.text(doc.splitTextToSize(n_cid, 75), 11, boxY + 23);
+        doc.text(n_fone, 91, boxY + 23);
+        doc.text(n_uf, 131, boxY + 23);
+        doc.text(n_ie, 146, boxY + 23);
         
         // --- TABELA ---
         const colunas = ["DATA", "DESCRIÇÃO / PRODUTO", "QTD", "VALOR (R$)"];
@@ -1367,7 +1427,7 @@ window.imprimirDebitosCliente = async () => {
         ]);
 
         doc.autoTable({
-            startY: 50,
+            startY: 70,
             head: [colunas],
             body: linhas,
             theme: 'grid',
@@ -1754,24 +1814,66 @@ window.imprimirNota = async (venda, itensCarrinho) => {
     // Vou colocar centralizado, que resolve para "NUTRIFORTE RACOES"
     doc.text(`EMP.: NUTRIFORTE RACOES`, 180, 37, { align: "center" });
 
-    // --- DADOS DO CLIENTE ---
-    const startYCliente = 50;
-    
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(`FANTASIA: ${venda.cliente}`, 10, startYCliente);
-    doc.text(`R.SOCIAL: ${venda.cliente}`, 130, startYCliente);
-    
-    doc.setFont("helvetica", "normal");
-    doc.text("Endereço não informado", 10, startYCliente + 5);
-    doc.text("COMPLEMENTO:", 130, startYCliente + 5);
-    
-    doc.text("CPF/CNPJ: null", 10, startYCliente + 10);
-    doc.text("BAIRRO:", 80, startYCliente + 10);
-    doc.text("CIDADE: Bom Jesus da Lapa", 130, startYCliente + 10);
+    // --- QUADRO PADRÃO: DESTINATÁRIO / REMETENTE ---
+    let c = clientesCache.find(x => x.nome === venda.cliente);
+    let n_nome = c?.nome || venda.cliente || "";
+    let n_cpf = c?.cpf || ""; let n_ie = c?.ie || ""; let n_end = c?.endereco || "";
+    let n_bairro = c?.bairro || ""; let n_cep = c?.cep || ""; let n_cid = c?.cidade || "";
+    let n_uf = c?.uf || ""; let n_fone = c?.tel || "";
 
+    const boxY = 48; // Posição vertical inicial do quadro
+    doc.setDrawColor(0);
+    doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
-    doc.text(`DATA: ${dataHoje}`, 190, startYCliente + 18, { align: "right" });
+    doc.text("DESTINATÁRIO / REMETENTE", 10, boxY - 2);
+
+    // Contorno e linhas horizontais
+    doc.rect(10, boxY, 190, 24); 
+    doc.line(10, boxY + 8, 200, boxY + 8); 
+    doc.line(10, boxY + 16, 200, boxY + 16); 
+
+    // Linhas Verticais (Divisórias idênticas à imagem)
+    doc.line(140, boxY, 140, boxY + 8); // Separa Nome / CNPJ
+    doc.line(175, boxY, 175, boxY + 8); // Separa CNPJ / Data
+    doc.line(110, boxY + 8, 110, boxY + 16); // Separa Endereço / Bairro
+    doc.line(160, boxY + 8, 160, boxY + 16); // Separa Bairro / CEP
+    doc.line(90, boxY + 16, 90, boxY + 24); // Separa Município / Fone
+    doc.line(130, boxY + 16, 130, boxY + 24); // Separa Fone / UF
+    doc.line(145, boxY + 16, 145, boxY + 24); // Separa UF / Insc. Estadual
+
+    // Textos pequenos dos cabeçalhos
+    doc.setFontSize(5);
+    doc.setFont("helvetica", "normal");
+    doc.text("NOME / RAZÃO SOCIAL", 11, boxY + 3);
+    doc.text("CNPJ / CPF", 141, boxY + 3);
+    doc.text("DATA DA EMISSÃO", 176, boxY + 3);
+
+    doc.text("ENDEREÇO", 11, boxY + 11);
+    doc.text("BAIRRO / DISTRITO", 111, boxY + 11);
+    doc.text("CEP", 161, boxY + 11);
+
+    doc.text("MUNICÍPIO", 11, boxY + 19);
+    doc.text("FONE / FAX", 91, boxY + 19);
+    doc.text("UF", 131, boxY + 19);
+    doc.text("INSCRIÇÃO ESTADUAL", 146, boxY + 19);
+
+    // Valores dinâmicos puxados do banco de dados
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text(n_nome, 11, boxY + 7);
+    doc.text(n_cpf, 141, boxY + 7);
+    doc.text(dataHoje, 176, boxY + 7);
+
+    doc.text(doc.splitTextToSize(n_end, 95), 11, boxY + 15);
+    doc.text(doc.splitTextToSize(n_bairro, 45), 111, boxY + 15);
+    doc.text(n_cep, 161, boxY + 15);
+
+    doc.text(doc.splitTextToSize(n_cid, 75), 11, boxY + 23);
+    doc.text(n_fone, 91, boxY + 23);
+    doc.text(n_uf, 131, boxY + 23);
+    doc.text(n_ie, 146, boxY + 23);
+
+    // IMPORTANTE: Altere o 'startY' da tabela logo abaixo para 78, para não atropelar o quadro
 
     // --- TABELA DE ITENS ---
     // Prepara os dados para a tabela
@@ -1787,7 +1889,7 @@ window.imprimirNota = async (venda, itensCarrinho) => {
     ]);
 
     doc.autoTable({
-        startY: 75,
+        startY: 78,
         head: [colunas],
         body: linhas,
         theme: 'plain', // Tema simples para parecer nota fiscal
@@ -1889,5 +1991,38 @@ window.excluirMassaEstoque = async () => { const c = document.querySelectorAll('
 window.excluirProduto = async (id) => { window.mostrarConfirmacao("Excluir?", "Apagar produto?", async () => { await deleteDoc(doc(db, COLECAO_PRODUTOS, id)); window.carregarEstoque(); }); };
 window.abrirEditarProduto = async (id) => { const p = produtosCache.find(x => x.id === id); if(p) { document.getElementById('edit-prod-id').value = id; document.getElementById('edit-prod-nome').value = p.nome; document.getElementById('edit-prod-custo').value = p.custo; document.getElementById('edit-prod-venda').value = p.venda; document.getElementById('edit-prod-qtd').value = p.qtd; document.getElementById('modal-prod').classList.remove('hidden'); } };
 window.salvarEdicaoProduto = async () => { const id = document.getElementById('edit-prod-id').value; window.mostrarLoading(true); await updateDoc(doc(db, COLECAO_PRODUTOS, id), { nome: document.getElementById('edit-prod-nome').value, custo: parseFloat(document.getElementById('edit-prod-custo').value), venda: parseFloat(document.getElementById('edit-prod-venda').value), qtd: parseFloat(document.getElementById('edit-prod-qtd').value) }); window.mostrarLoading(false); document.getElementById('modal-prod').classList.add('hidden'); window.carregarEstoque(); };
-window.abrirEditarCliente = async (id) => { let c = clientesCache.find(x => x.id === id); if(c){ document.getElementById('edit-cli-id').value = id; document.getElementById('edit-cli-nome').value = c.nome; document.getElementById('edit-cli-tel').value = c.tel || ''; document.getElementById('edit-cli-cpf').value = c.cpf || ''; document.getElementById('edit-cli-endereco').value = c.endereco || ''; document.getElementById('modal-cliente-edit').classList.remove('hidden'); } };
-window.salvarEdicaoCliente = async () => { const id = document.getElementById('edit-cli-id').value; window.mostrarLoading(true); await updateDoc(doc(db, COLECAO_CLIENTES, id), { nome: document.getElementById('edit-cli-nome').value.toUpperCase(), tel: document.getElementById('edit-cli-tel').value, cpf: document.getElementById('edit-cli-cpf').value, endereco: document.getElementById('edit-cli-endereco').value }); window.mostrarLoading(false); document.getElementById('modal-cliente-edit').classList.add('hidden'); window.carregarClientes(); };
+window.abrirEditarCliente = async (id) => { 
+    let c = clientesCache.find(x => x.id === id); 
+    if(c){ 
+        document.getElementById('edit-cli-id').value = id; 
+        document.getElementById('edit-cli-nome').value = c.nome; 
+        document.getElementById('edit-cli-tel').value = c.tel || ''; 
+        document.getElementById('edit-cli-cpf').value = c.cpf || ''; 
+        document.getElementById('edit-cli-ie').value = c.ie || ''; 
+        document.getElementById('edit-cli-cep').value = c.cep || ''; 
+        document.getElementById('edit-cli-endereco').value = c.endereco || ''; 
+        document.getElementById('edit-cli-bairro').value = c.bairro || ''; 
+        document.getElementById('edit-cli-cidade').value = c.cidade || ''; 
+        document.getElementById('edit-cli-uf').value = c.uf || ''; 
+        document.getElementById('modal-cliente-edit').classList.remove('hidden'); 
+    } 
+};
+
+window.salvarEdicaoCliente = async () => { 
+    const id = document.getElementById('edit-cli-id').value; 
+    window.mostrarLoading(true); 
+    await updateDoc(doc(db, COLECAO_CLIENTES, id), { 
+        nome: document.getElementById('edit-cli-nome').value.toUpperCase(), 
+        tel: document.getElementById('edit-cli-tel').value, 
+        cpf: document.getElementById('edit-cli-cpf').value, 
+        ie: document.getElementById('edit-cli-ie').value,
+        cep: document.getElementById('edit-cli-cep').value,
+        endereco: document.getElementById('edit-cli-endereco').value.toUpperCase(),
+        bairro: document.getElementById('edit-cli-bairro').value.toUpperCase(),
+        cidade: document.getElementById('edit-cli-cidade').value.toUpperCase(),
+        uf: document.getElementById('edit-cli-uf').value.toUpperCase()
+    }); 
+    window.mostrarLoading(false); 
+    document.getElementById('modal-cliente-edit').classList.add('hidden'); 
+    window.carregarClientes(); 
+};
