@@ -12,6 +12,32 @@ body.dark-mode input, body.dark-mode select { background-color: #020617; color: 
 body.dark-mode tr:hover td { background: #334155; }
 body.dark-mode th { background: #1E293B; color: #e2e8f0; }
 
+/* Restrições para o perfil Vendedor */
+body.perfil-vendedor li[data-target="dashboard"],
+body.perfil-vendedor li[data-target="gastos"],
+body.perfil-vendedor #bulk-actions, 
+body.perfil-vendedor #bulk-actions-gastos,
+body.perfil-vendedor #bulk-actions-estoque,
+body.perfil-vendedor .btn-delete {
+    display: none !important;
+}
+
+/* BLOQUEIOS DE ACESSO PARA O PERFIL VENDEDOR */
+body.perfil-vendedor #menu-funcionarios,
+body.perfil-vendedor li[data-target="dashboard"],
+body.perfil-vendedor li[data-target="gastos"],
+body.perfil-vendedor #bulk-actions, 
+body.perfil-vendedor #bulk-actions-gastos,
+body.perfil-vendedor #bulk-actions-estoque,
+body.perfil-vendedor #bulk-actions-clientes,
+body.perfil-vendedor #bulk-actions-devedores,
+body.perfil-vendedor .btn-delete,
+body.perfil-vendedor #form-produto,
+body.perfil-vendedor #btn-add-cat,
+body.perfil-vendedor #btn-del-cat {
+    display: none !important;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Poppins', sans-serif; background: var(--bg-app); color: var(--text-main); height: 100vh; overflow: hidden; line-height: 1.5; }
 .hidden { display: none !important; }

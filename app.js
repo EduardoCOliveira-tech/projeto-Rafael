@@ -4,6 +4,9 @@ import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
 import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, doc, updateDoc, deleteDoc, increment, getDoc, writeBatch, enableIndexedDbPersistence, startAfter } 
        from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
+// Variável para sabermos quem está usando o sistema
+let usuarioAtual = { email: '', role: 'gerente' };
+
 // ============================================================
 // 1. CONFIGURAÇÃO
 // ============================================================
@@ -22,6 +25,9 @@ try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
+    // LOGO ABAIXO DA INICIALIZAÇÃO PRINCIPAL DO FIREBASE (LÁ PELA LINHA 25)
+    const appSecundario = initializeApp(firebaseConfig, "AppSecundario");
+    const authSecundario = getAuth(appSecundario);
     
     // ATIVAR CACHE OFFLINE (Deixa o carregamento instantâneo)
     enableIndexedDbPersistence(db).catch((err) => {
@@ -200,6 +206,7 @@ function renderizarTabelaEstoque() {
     let sumRevenda = 0;
     const lista = filtroCategoriaEstoque === "TODOS" ? produtosCache : produtosCache.filter(p => p.categoria === filtroCategoriaEstoque);
 
+    // A linha abaixo é a que estava faltando e causava o erro!
     let htmlBuffer = '';
     
     lista.forEach(p => {
@@ -406,8 +413,8 @@ function renderizarTabelaHistorico() {
     const tbody = document.querySelector('#tabela-historico tbody');
     if(!tbody) return;
     let htmlBuffer = '';
+    
     historicoCache.forEach(v => {
-        // Adicionamos o 'options' para incluir a hora
         const dataObj = v.data && v.data.seconds ? new Date(v.data.seconds * 1000) : null;
         const dataF = dataObj ? dataObj.toLocaleDateString('pt-BR') + ' ' + dataObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}) : '-';
         let pg = v.metodo === 'aver' ? 'Fiado' : v.metodo;
@@ -416,8 +423,21 @@ function renderizarTabelaHistorico() {
         let rowStyle = '';
         if(v.total < 0 && !v.pago) { b = 'badge-success'; st = 'PAGTO DÍVIDA'; rowStyle = 'style="background:#f0fdf4"'; }
         
-        htmlBuffer += `<tr ${rowStyle}><td style="text-align:center"><input type="checkbox" class="sale-checkbox" value="${v.id}"></td><td>${dataF}</td><td>${v.cliente}</td><td>${v.produtoNome}</td><td>${v.qtd||1}</td><td style="${v.total<0?'color:green;font-weight:bold':''}">${v.total<0?'R$ '+Math.abs(v.total).toFixed(2)+' (Abatido)':'R$ '+v.total.toFixed(2)}</td><td>${pg}</td><td><span class="badge ${b}">${st}</span></td><td><button onclick="window.abrirEdicao('${v.id}','${v.total}','${v.metodo}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button></td></tr>`;
+        // --- LÓGICA DE PERMISSÃO (SÓ APAGA SUAS VENDAS DO DIA) ---
+        const hojeDataStr = new Date().toLocaleDateString('pt-BR');
+        const vendaDataStr = dataObj ? dataObj.toLocaleDateString('pt-BR') : '';
+        let podeEditar = true;
+        
+        if (usuarioAtual.role === 'vendedor') {
+            podeEditar = (v.vendedor === usuarioAtual.email && vendaDataStr === hojeDataStr);
+        }
+        
+        let checkboxHtml = podeEditar ? `<input type="checkbox" class="sale-checkbox" value="${v.id}" data-pid="${v.produtoId}" data-qtd="${v.qtd}">` : `<i class="fas fa-lock" style="color:#cbd5e1" title="Restrito"></i>`;
+        let btnEditHtml = podeEditar ? `<button onclick="window.abrirEdicao('${v.id}','${v.total}','${v.metodo}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button>` : '';
+
+        htmlBuffer += `<tr ${rowStyle}><td style="text-align:center">${checkboxHtml}</td><td>${dataF}</td><td>${v.cliente}</td><td>${v.produtoNome}</td><td>${v.qtd||1}</td><td style="${v.total<0?'color:green;font-weight:bold':''}">${v.total<0?'R$ '+Math.abs(v.total).toFixed(2)+' (Abatido)':'R$ '+v.total.toFixed(2)}</td><td>${pg}</td><td><span class="badge ${b}">${st}</span></td><td>${btnEditHtml}</td></tr>`;
     });
+    
     tbody.innerHTML = htmlBuffer;
     configurarCheckboxes('select-all','sale-checkbox','bulk-actions',null);
 }
@@ -619,6 +639,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if(target === 'devedores') window.carregarDevedores();
                 if(target === 'estoque') window.carregarEstoque();
                 if(target === 'clientes') window.carregarClientes();
+                if(target === 'funcionarios') window.carregarFuncionarios();
             });
         });
     }
@@ -883,15 +904,68 @@ document.getElementById('prod-nome')?.addEventListener('input', function() {
 // ============================================================
 document.getElementById('btn-logout')?.addEventListener('click', () => signOut(auth));
 
-onAuthStateChanged(auth, (user) => {
+// --- SISTEMA DE LOGOFF AUTOMÁTICO ---
+let tempoLogoff;
+
+function resetarTimer() {
+    clearTimeout(tempoLogoff);
+    // Define o tempo de inatividade para 15 minutos (15 * 60 * 1000 milissegundos)
+    tempoLogoff = setTimeout(() => {
+        const user = auth.currentUser;
+        if (user) {
+            signOut(auth);
+            window.mostrarAlerta("Sessão Expirada", "Você foi desconectado por inatividade de 5 minutos.", "warning");
+        }
+    }, 300000); 
+}
+
+function iniciarTimerLogoff() {
+    // Detecta qualquer interação do usuário com a página para zerar o tempo
+    window.onmousemove = resetarTimer;
+    window.onmousedown = resetarTimer;
+    window.ontouchstart = resetarTimer;
+    window.onclick = resetarTimer;
+    window.onkeypress = resetarTimer;
+    window.onscroll = resetarTimer;
+    resetarTimer();
+}
+
+onAuthStateChanged(auth, async (user) => {
     if (user) {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('app-screen').classList.remove('hidden');
         document.getElementById('user-email-display').innerText = user.email;
+        
+        usuarioAtual.email = user.email;
+        usuarioAtual.role = 'gerente'; // Perfil padrão se for o dono e ainda não estiver no banco
+        
+        try {
+            const q = query(collection(db, 'loja_usuarios'), where("email", "==", user.email));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+                usuarioAtual.role = snap.docs[0].data().role;
+            }
+            
+            // SE FOI DESATIVADO PELO GERENTE:
+            if (usuarioAtual.role === 'inativo') {
+                window.mostrarAlerta("Acesso Negado", "Seu acesso foi revogado pelo administrador.", "error");
+                signOut(auth);
+                return;
+            }
+
+            if (usuarioAtual.role === 'vendedor') {
+                document.body.classList.add('perfil-vendedor');
+            } else {
+                document.body.classList.remove('perfil-vendedor');
+            }
+        } catch (e) { console.error("Erro ao verificar perfil:", e); }
+
         iniciarApp();
+        if(window.iniciarTimerLogoff) window.iniciarTimerLogoff();
     } else {
         document.getElementById('login-screen').classList.remove('hidden');
         document.getElementById('app-screen').classList.add('hidden');
+        if(typeof tempoLogoff !== 'undefined') clearTimeout(tempoLogoff);
     }
 });
 
@@ -1940,8 +2014,13 @@ window.imprimirNota = async (venda, itensCarrinho) => {
     doc.text("Aceite do Cliente:", 12, finalY + 19);
     doc.line(40, finalY + 19, 110, finalY + 19); // Linha para assinatura
     
+    // --- NOME DO CLIENTE ABAIXO DA LINHA ---
+    const nomeClienteFiado = venda.cliente || 'Consumidor Final';
+    doc.setFontSize(7);
+    doc.text(nomeClienteFiado, 75, finalY + 23, { align: "center" });
+    
     doc.setFontSize(9);
-    doc.text("AJUSTE DE ESTOQUE", 60, finalY + 24, { align: "center" });
+    doc.text("NUTRIFORTE", 60, finalY + 28, { align: "center" }); // Substituí "AJUSTE DE ESTOQUE" para não encavalar com o nome do cliente
 
     // Bloco Direito (Totais)
     // Linhas verticais do bloco de totais
@@ -2025,4 +2104,58 @@ window.salvarEdicaoCliente = async () => {
     window.mostrarLoading(false); 
     document.getElementById('modal-cliente-edit').classList.add('hidden'); 
     window.carregarClientes(); 
+};
+// --- LÓGICA DE FUNCIONÁRIOS ---
+window.carregarFuncionarios = async () => {
+    if(usuarioAtual.role !== 'gerente') return; // Segurança extra
+    const snap = await getDocs(collection(db, 'loja_usuarios'));
+    const tb = document.querySelector('#tabela-funcionarios tbody');
+    if(!tb) return;
+    let html = '';
+    snap.forEach(d => {
+        const u = d.data();
+        let statusRole = u.role === 'inativo' ? '<span style="color:red;font-weight:bold">REVOGADO</span>' : u.role.toUpperCase();
+        html += `<tr>
+            <td>${u.nome}</td><td>${u.email}</td><td>${statusRole}</td>
+            <td>
+                ${u.role !== 'inativo' ? `<button onclick="window.revogarFuncionario('${d.id}')" class="btn-primary" style="background:#ef4444;font-size:0.8rem">Revogar Acesso</button>` : ''}
+            </td>
+        </tr>`;
+    });
+    tb.innerHTML = html;
+};
+
+document.getElementById('form-funcionario')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nome = document.getElementById('func-nome').value;
+    const email = document.getElementById('func-email').value;
+    const senha = document.getElementById('func-senha').value;
+    const role = document.getElementById('func-role').value;
+    
+    window.mostrarLoading(true);
+    try {
+        // Cria usuário sem deslogar o gerente
+        await createUserWithEmailAndPassword(authSecundario, email, senha);
+        await signOut(authSecundario);
+        
+        // Salva perfil no banco
+        await addDoc(collection(db, 'loja_usuarios'), { nome, email, role });
+        
+        window.mostrarAlerta("Sucesso", "Funcionário cadastrado!", "success");
+        document.getElementById('form-funcionario').reset();
+        window.carregarFuncionarios();
+    } catch(err) {
+        window.mostrarAlerta("Erro", "Erro ao criar funcionário. O E-mail já pode estar em uso.", "error");
+    }
+    window.mostrarLoading(false);
+});
+
+window.revogarFuncionario = async (id) => {
+    window.mostrarConfirmacao("Revogar Acesso?", "O funcionário não poderá mais fazer login no sistema.", async () => {
+        window.mostrarLoading(true);
+        await updateDoc(doc(db, 'loja_usuarios', id), { role: 'inativo' });
+        window.mostrarLoading(false);
+        window.carregarFuncionarios();
+        window.mostrarAlerta("Sucesso", "Acesso revogado com sucesso.", "success");
+    });
 };

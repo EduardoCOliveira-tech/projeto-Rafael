@@ -114,6 +114,7 @@
                 <li data-target="historico"><i class="fas fa-list-alt"></i> <span>Histórico</span></li>
                 <li data-target="estoque"><i class="fas fa-boxes"></i> <span>Estoque</span></li>
                 <li data-target="devedores"><i class="fas fa-users"></i> <span>Devedores</span></li>
+                <li data-target="funcionarios" id="menu-funcionarios"><i class="fas fa-id-badge"></i> <span>Funcionários</span></li>
             </ul>
             <div class="sidebar-footer">
                 <button onclick="document.getElementById('modal-backup').classList.remove('hidden')" class="btn-primary" style="width: 100%; background: #e67e22; font-size: 0.8rem; margin-bottom: 10px;">
@@ -339,6 +340,34 @@
                 </div>
                 <div style="margin-bottom: 10px;"><input type="text" id="busca-devedores" placeholder="🔍 Pesquisar..." onkeyup="window.filtrarDevedores()" style="padding: 10px; width: 100%;"></div>
                 <div class="table-responsive"><table id="tabela-devedores"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-dev"></th><th class="sortable" onclick="window.ordenarTabela('devedores', 'nome')">Cliente <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('devedores', 'total')">Total Devendo <i class="fas fa-sort"></i></th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+            </section>
+            <section id="funcionarios" class="view">
+                <h2>Gerenciar Funcionários</h2>
+                <div class="card form-container" style="margin-top: 15px;">
+                    <form id="form-funcionario">
+                        <div class="form-row">
+                            <div class="form-group" style="flex:2"><label>Nome</label><input type="text" id="func-nome" required></div>
+                            <div class="form-group" style="flex:2"><label>E-mail (Login)</label><input type="email" id="func-email" required></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1"><label>Senha (Mín. 6 letras)</label><input type="password" id="func-senha" required minlength="6"></div>
+                            <div class="form-group" style="flex:1">
+                                <label>Perfil</label>
+                                <select id="func-role">
+                                    <option value="vendedor">Vendedor (Acesso Restrito)</option>
+                                    <option value="gerente">Gerente (Acesso Total)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary" style="margin-top: 10px; width: 100%;">Cadastrar Funcionário</button>
+                    </form>
+                </div>
+                <div class="table-responsive" style="margin-top: 20px;">
+                    <table id="tabela-funcionarios">
+                        <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Ação</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </section>
         </main>
     </div>
