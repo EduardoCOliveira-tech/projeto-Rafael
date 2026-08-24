@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, setPersistence, browserSessionPersistence } 
        from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, doc, updateDoc, deleteDoc, increment, getDoc, writeBatch, enableIndexedDbPersistence, startAfter } 
+import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, doc, updateDoc, deleteDoc, increment, getDoc, writeBatch, startAfter } 
        from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
 // Variável para sabermos quem está usando o sistema
@@ -21,22 +21,22 @@ const firebaseConfig = {
 };
 
 let app, auth, db;
+let appSecundario, authSecundario; 
+
 try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
-    // LOGO ABAIXO DA INICIALIZAÇÃO PRINCIPAL DO FIREBASE (LÁ PELA LINHA 25)
-    const appSecundario = initializeApp(firebaseConfig, "AppSecundario");
-    const authSecundario = getAuth(appSecundario);
     
-    // ATIVAR CACHE OFFLINE (Deixa o carregamento instantâneo)
-    enableIndexedDbPersistence(db).catch((err) => {
-        if (err.code == 'failed-precondition') {
-            console.log('Múltiplas abas abertas. Persistência habilitada apenas em uma.');
-        } else if (err.code == 'unimplemented') {
-            console.log('Navegador não suporta persistência.');
-        }
-    });
+    // 1. BLOQUEIO DE SESSÃO: Desloga o usuário assim que fechar a aba/navegador
+    setPersistence(auth, browserSessionPersistence);
+    
+    // INICIALIZAÇÃO DO APP SECUNDÁRIO (Para criar funcionário sem deslogar o gerente)
+    appSecundario = initializeApp(firebaseConfig, "AppSecundario");
+    authSecundario = getAuth(appSecundario);
+    
+    // 2. O CACHE OFFLINE FOI REMOVIDO PARA SEGURANÇA DOS DADOS NO PC
+    
 } catch (e) {
     console.error("Erro Firebase:", e);
 }
@@ -909,14 +909,14 @@ let tempoLogoff;
 
 function resetarTimer() {
     clearTimeout(tempoLogoff);
-    // Define o tempo de inatividade para 15 minutos (15 * 60 * 1000 milissegundos)
-    tempoLogoff = setTimeout(() => {
+    tempoLogoff = setTimeout(async () => {
         const user = auth.currentUser;
         if (user) {
-            signOut(auth);
-            window.mostrarAlerta("Sessão Expirada", "Você foi desconectado por inatividade de 5 minutos.", "warning");
+            // O alert nativo pausa o sistema até o usuário ler e clicar em OK
+            alert("SESSÃO EXPIRADA!\n\nVocê foi desconectado por inatividade de 15 minutos para a segurança do sistema.");
+            await signOut(auth); // Faz o logout, o que ativará o recarregamento automático do Passo 1
         }
-    }, 300000); 
+    }, 100000); 
 }
 
 function iniciarTimerLogoff() {
@@ -930,14 +930,18 @@ function iniciarTimerLogoff() {
     resetarTimer();
 }
 
+let primeiraVerificacao = true; // Variável para saber se acabou de abrir a página
+
 onAuthStateChanged(auth, async (user) => {
     if (user) {
+        primeiraVerificacao = false; // A partir daqui, ele já está logado
+        
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('app-screen').classList.remove('hidden');
         document.getElementById('user-email-display').innerText = user.email;
         
         usuarioAtual.email = user.email;
-        usuarioAtual.role = 'gerente'; // Perfil padrão se for o dono e ainda não estiver no banco
+        usuarioAtual.role = 'inativo'; 
         
         try {
             const q = query(collection(db, 'loja_usuarios'), where("email", "==", user.email));
@@ -946,26 +950,40 @@ onAuthStateChanged(auth, async (user) => {
                 usuarioAtual.role = snap.docs[0].data().role;
             }
             
-            // SE FOI DESATIVADO PELO GERENTE:
             if (usuarioAtual.role === 'inativo') {
-                window.mostrarAlerta("Acesso Negado", "Seu acesso foi revogado pelo administrador.", "error");
-                signOut(auth);
+                alert("ACESSO NEGADO:\nSeu acesso foi revogado pelo administrador.");
+                await signOut(auth);
                 return;
             }
 
             if (usuarioAtual.role === 'vendedor') {
                 document.body.classList.add('perfil-vendedor');
+                // Força o sistema a "clicar" na aba de Nova Venda para tirar o Dashboard da tela
+                setTimeout(() => {
+                    document.querySelector('li[data-target="vendas"]')?.click();
+                }, 50);
             } else {
                 document.body.classList.remove('perfil-vendedor');
+                // Força o sistema a "clicar" no Dashboard para garantir a tela certa para o Gerente
+                setTimeout(() => {
+                    document.querySelector('li[data-target="dashboard"]')?.click();
+                }, 50);
             }
         } catch (e) { console.error("Erro ao verificar perfil:", e); }
 
         iniciarApp();
-        if(window.iniciarTimerLogoff) window.iniciarTimerLogoff();
+        if(typeof iniciarTimerLogoff === 'function') iniciarTimerLogoff();
     } else {
-        document.getElementById('login-screen').classList.remove('hidden');
-        document.getElementById('app-screen').classList.add('hidden');
-        if(typeof tempoLogoff !== 'undefined') clearTimeout(tempoLogoff);
+        // SE NÃO É A PRIMEIRA VERIFICAÇÃO, SIGNIFICA QUE ELE ACABOU DE CLICAR EM "SAIR"
+        if (!primeiraVerificacao) {
+            window.location.reload(); // Força o recarregamento (limpa memória, carrinho e tabelas)
+        } else {
+            // Se for só a página abrindo pela primeira vez, só mostra a tela de login normalmente
+            primeiraVerificacao = false;
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('app-screen').classList.add('hidden');
+            if(typeof tempoLogoff !== 'undefined') clearTimeout(tempoLogoff);
+        }
     }
 });
 
@@ -1528,8 +1546,15 @@ window.imprimirDebitosCliente = async () => {
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
         doc.text("Reconheço a dívida acima descrita.", 10, finalY + 20);
-        doc.line(10, finalY + 35, 100, finalY + 35);
-        doc.text("Assinatura do Cliente", 10, finalY + 40);
+        
+        doc.line(10, finalY + 35, 100, finalY + 35); // Linha para assinatura
+        
+        // --- NOME DO CLIENTE SOB A LINHA (Centralizado) ---
+        doc.setFont("helvetica", "bold");
+        doc.text(n_nome, 55, finalY + 39, { align: "center" }); // 55 é o meio exato da linha
+        
+        doc.setFont("helvetica", "normal");
+        doc.text("Assinatura do Cliente", 55, finalY + 43, { align: "center" });
 
         window.open(doc.output('bloburl'), '_blank');
         
@@ -2012,15 +2037,17 @@ window.imprimirNota = async (venda, itensCarrinho) => {
     doc.text("Data Recebimento: _____/_____/_______", 12, finalY + 12);
     
     doc.text("Aceite do Cliente:", 12, finalY + 19);
-    doc.line(40, finalY + 19, 110, finalY + 19); // Linha para assinatura
+    doc.line(40, finalY + 19, 120, finalY + 19); // Linha de assinatura um pouco maior
     
-    // --- NOME DO CLIENTE ABAIXO DA LINHA ---
+    // NOME DO CLIENTE EM NEGRITO E CENTRALIZADO
     const nomeClienteFiado = venda.cliente || 'Consumidor Final';
-    doc.setFontSize(7);
-    doc.text(nomeClienteFiado, 75, finalY + 23, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text(nomeClienteFiado, 80, finalY + 23, { align: "center" }); // 80 é o meio da linha (entre 40 e 120)
     
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text("NUTRIFORTE", 60, finalY + 28, { align: "center" }); // Substituí "AJUSTE DE ESTOQUE" para não encavalar com o nome do cliente
+    doc.text("NUTRIFORTE", 80, finalY + 28, { align: "center" }); // Substituí "AJUSTE DE ESTOQUE" para não encavalar com o nome do cliente
 
     // Bloco Direito (Totais)
     // Linhas verticais do bloco de totais
@@ -2107,18 +2134,23 @@ window.salvarEdicaoCliente = async () => {
 };
 // --- LÓGICA DE FUNCIONÁRIOS ---
 window.carregarFuncionarios = async () => {
-    if(usuarioAtual.role !== 'gerente') return; // Segurança extra
+    if(usuarioAtual.role !== 'gerente') return; 
     const snap = await getDocs(collection(db, 'loja_usuarios'));
     const tb = document.querySelector('#tabela-funcionarios tbody');
     if(!tb) return;
     let html = '';
+    
     snap.forEach(d => {
         const u = d.data();
-        let statusRole = u.role === 'inativo' ? '<span style="color:red;font-weight:bold">REVOGADO</span>' : u.role.toUpperCase();
+        let statusRole = u.role === 'inativo' 
+            ? '<span class="badge badge-danger">REVOGADO</span>' 
+            : `<span class="badge badge-success">${u.role.toUpperCase()}</span>`;
+            
         html += `<tr>
             <td>${u.nome}</td><td>${u.email}</td><td>${statusRole}</td>
             <td>
-                ${u.role !== 'inativo' ? `<button onclick="window.revogarFuncionario('${d.id}')" class="btn-primary" style="background:#ef4444;font-size:0.8rem">Revogar Acesso</button>` : ''}
+                <button onclick="window.abrirEditarFuncionario('${d.id}', '${u.nome}', '${u.role}')" class="btn-icon btn-edit" title="Editar"><i class="fas fa-edit"></i></button>
+                <button onclick="window.excluirFuncionario('${d.id}', '${u.email}')" class="btn-icon btn-delete" title="Excluir Permanente"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`;
     });
@@ -2134,28 +2166,97 @@ document.getElementById('form-funcionario')?.addEventListener('submit', async (e
     
     window.mostrarLoading(true);
     try {
-        // Cria usuário sem deslogar o gerente
-        await createUserWithEmailAndPassword(authSecundario, email, senha);
-        await signOut(authSecundario);
+        // 1. Verifica se o e-mail já está na tabela de permissões (loja_usuarios)
+        const q = query(collection(db, 'loja_usuarios'), where("email", "==", email));
+        const snap = await getDocs(q);
         
-        // Salva perfil no banco
+        if (!snap.empty) {
+            window.mostrarLoading(false);
+            return window.mostrarAlerta("Aviso", "Este e-mail já está na lista de funcionários!", "warning");
+        }
+
+        // 2. Tenta criar a conta no Autenticador do Firebase
+        try {
+            await createUserWithEmailAndPassword(authSecundario, email, senha);
+            await signOut(authSecundario);
+        } catch (authErr) {
+            // Se o e-mail já existir no sistema (caso do Gerente), não tem problema! 
+            // O sistema engole esse erro e passa para a próxima etapa.
+            if (authErr.code === 'auth/email-already-in-use') {
+                console.log("Conta já existe no Auth. Vinculando à tabela de permissões...");
+            } else {
+                throw authErr; // Se for outro erro (como senha fraca), joga para o catch principal
+            }
+        }
+        
+        // 3. Salva o perfil no banco de dados (Firestore)
         await addDoc(collection(db, 'loja_usuarios'), { nome, email, role });
         
-        window.mostrarAlerta("Sucesso", "Funcionário cadastrado!", "success");
+        window.mostrarAlerta("Sucesso", "Funcionário salvo/vinculado com sucesso!", "success");
         document.getElementById('form-funcionario').reset();
         window.carregarFuncionarios();
+        
     } catch(err) {
-        window.mostrarAlerta("Erro", "Erro ao criar funcionário. O E-mail já pode estar em uso.", "error");
+        console.error("Erro real do Firebase:", err); 
+        
+        let msgErro = "Erro ao criar funcionário.";
+        
+        if (err.code === 'auth/weak-password') {
+            msgErro = "A senha é muito fraca (deve ter no mínimo 6 caracteres).";
+        } else if (err.code === 'auth/network-request-failed') {
+            msgErro = "Falha de rede. Verifique sua conexão com a internet ou bloqueios de VPN/Antivírus.";
+        } else {
+            msgErro += " Detalhe: " + err.message;
+        }
+
+        window.mostrarAlerta("Erro", msgErro, "error");
+    } finally {
+        window.mostrarLoading(false);
     }
-    window.mostrarLoading(false);
 });
 
-window.revogarFuncionario = async (id) => {
-    window.mostrarConfirmacao("Revogar Acesso?", "O funcionário não poderá mais fazer login no sistema.", async () => {
-        window.mostrarLoading(true);
-        await updateDoc(doc(db, 'loja_usuarios', id), { role: 'inativo' });
-        window.mostrarLoading(false);
+// Abre a janela para editar nome e perfil
+window.abrirEditarFuncionario = (id, nome, role) => {
+    document.getElementById('edit-func-id').value = id;
+    document.getElementById('edit-func-nome').value = nome;
+    document.getElementById('edit-func-role').value = role;
+    document.getElementById('modal-func-edit').classList.remove('hidden');
+};
+
+// Salva a edição
+window.salvarEdicaoFuncionario = async () => {
+    const id = document.getElementById('edit-func-id').value;
+    const nome = document.getElementById('edit-func-nome').value;
+    const role = document.getElementById('edit-func-role').value;
+    
+    window.mostrarLoading(true);
+    try {
+        await updateDoc(doc(db, 'loja_usuarios', id), { nome, role });
+        window.mostrarAlerta("Sucesso", "Funcionário atualizado!", "success");
+        document.getElementById('modal-func-edit').classList.add('hidden');
         window.carregarFuncionarios();
-        window.mostrarAlerta("Sucesso", "Acesso revogado com sucesso.", "success");
+    } catch(e) {
+        window.mostrarAlerta("Erro", "Falha ao atualizar.", "error");
+    } finally {
+        window.mostrarLoading(false);
+    }
+};
+
+// Apaga o funcionário do banco de dados
+window.excluirFuncionario = (id, email) => {
+    if (email === usuarioAtual.email) {
+        return window.mostrarAlerta("Atenção", "Você não pode excluir sua própria conta por aqui!", "warning");
+    }
+    window.mostrarConfirmacao("Apagar Funcionário?", "O funcionário será apagado do sistema e perderá o acesso.", async () => {
+        window.mostrarLoading(true);
+        try {
+            await deleteDoc(doc(db, 'loja_usuarios', id));
+            window.mostrarAlerta("Sucesso", "Funcionário excluído com sucesso!", "success");
+            window.carregarFuncionarios();
+        } catch(e) {
+            window.mostrarAlerta("Erro", "Falha ao excluir.", "error");
+        } finally {
+            window.mostrarLoading(false);
+        }
     });
 };
