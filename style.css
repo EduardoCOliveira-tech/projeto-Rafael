@@ -1,28 +1,305 @@
+/* =========================================================
+   VARIÁVEIS DE CORES E MEDIDAS (TEMA MODERNO)
+   ========================================================= */
 :root {
-    --primary: #4F46E5; --primary-dark: #3730A3; --secondary: #1E293B; --accent: #06B6D4;
-    --success: #10B981; --danger: #EF4444; --warning: #F59E0B;
-    --bg-app: #F1F5F9; --bg-card: #FFFFFF; --text-main: #334155; --text-muted: #64748B; --border-color: #E2E8F0;
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1); --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-    --radius-md: 10px; --radius-lg: 16px;
+    --primary: #4F46E5; 
+    --primary-dark: #3730A3; 
+    --secondary: #1E293B; 
+    --accent: #6366F1;
+    --success: #10B981; 
+    --danger: #EF4444; 
+    --warning: #F59E0B;
+    --bg-app: #F8FAFC; /* Fundo levemente mais claro e limpo */
+    --bg-card: #FFFFFF; 
+    --text-main: #334155; 
+    --text-muted: #64748B; 
+    --border-color: #E2E8F0;
+    
+    /* Sombras mais suaves e difusas inspiradas no design Apple/Stripe */
+    --shadow-sm: 0 2px 4px rgba(0,0,0,0.02); 
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.05); 
+    --shadow-lg: 0 10px 25px rgba(0,0,0,0.08);
+    --radius-md: 12px; 
+    --radius-lg: 20px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* =========================================================
+   TEMA ESCURO (DARK MODE)
+   ========================================================= */
 body.dark-mode {
-    --bg-app: #0F172A !important; --bg-card: #1E293B !important; --text-main: #F1F5F9 !important; --text-muted: #94A3B8 !important; --border-color: #334155 !important; --shadow-sm: none; color-scheme: dark; 
+    --bg-app: #0F172A !important; 
+    --bg-card: #1E293B !important; 
+    --text-main: #F1F5F9 !important; 
+    --text-muted: #94A3B8 !important; 
+    --border-color: #334155 !important; 
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.2);
+    --shadow-lg: 0 10px 25px rgba(0,0,0,0.4);
+    color-scheme: dark; 
 }
 body.dark-mode input, body.dark-mode select { background-color: #020617; color: white; border-color: #334155; }
 body.dark-mode tr:hover td { background: #334155; }
-body.dark-mode th { background: #1E293B; color: #e2e8f0; }
+body.dark-mode th { background: #0F172A; color: #e2e8f0; border-bottom: 2px solid #334155; }
 
-/* Restrições para o perfil Vendedor */
-body.perfil-vendedor li[data-target="dashboard"],
-body.perfil-vendedor li[data-target="gastos"],
-body.perfil-vendedor #bulk-actions, 
-body.perfil-vendedor #bulk-actions-gastos,
-body.perfil-vendedor #bulk-actions-estoque,
-body.perfil-vendedor .btn-delete {
-    display: none !important;
+/* =========================================================
+   RESET E BASE
+   ========================================================= */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { 
+    font-family: 'Poppins', sans-serif; 
+    background: var(--bg-app); 
+    color: var(--text-main); 
+    height: 100vh; 
+    overflow: hidden; 
+    line-height: 1.6; 
+    -webkit-font-smoothing: antialiased;
+}
+.hidden { display: none !important; }
+
+/* Customização da Barra de Rolagem (Scrollbar) */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+body.dark-mode ::-webkit-scrollbar-thumb { background: #475569; }
+
+/* =========================================================
+   BOTÕES (COM EFEITO DE FLUTUAÇÃO)
+   ========================================================= */
+button { 
+    font-family: 'Poppins', sans-serif; 
+    font-weight: 500; 
+    border-radius: var(--radius-md); 
+    cursor: pointer; 
+    border: none; 
+    transition: var(--transition); 
+}
+.btn-primary { 
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%); 
+    color: white; 
+    padding: 10px 20px; 
+    box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2); 
+}
+.btn-primary:hover { 
+    transform: translateY(-2px); /* Levanta o botão */
+    box-shadow: 0 6px 15px rgba(79, 70, 229, 0.4); 
+    filter: brightness(1.1);
 }
 
-/* BLOQUEIOS DE ACESSO PARA O PERFIL VENDEDOR */
+.btn-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white; 
+    padding: 8px 16px; 
+    font-size: 0.9rem; 
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); 
+    display: inline-flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 8px; 
+    font-weight: 600;
+}
+.btn-success:hover { 
+    transform: translateY(-2px); 
+    box-shadow: 0 6px 15px rgba(16, 185, 129, 0.35); 
+}
+
+.btn-icon { border: none; background: transparent; cursor: pointer; font-size: 1.1rem; padding: 8px; border-radius: 50%; transition: var(--transition); }
+.btn-edit { color: var(--primary); } 
+.btn-delete { color: var(--danger); }
+.btn-edit:hover { background: #e0e7ff; transform: scale(1.1); } 
+.btn-delete:hover { background: #fee2e2; transform: scale(1.1); }
+
+#bulk-actions-clientes button, #bulk-actions-historico button, #bulk-actions-estoque button, #bulk-actions-devedores button, #bulk-actions-gastos button, #bulk-actions button {
+    width: auto; height: auto; padding: 8px 16px; border-radius: var(--radius-md); white-space: nowrap; font-weight: 600;
+}
+.error-msg { color: var(--danger); font-size: 0.9rem; margin-top: 10px; text-align: center; }
+
+/* =========================================================
+   LOGIN
+   ========================================================= */
+#login-screen { 
+    height: 100vh; display: flex; align-items: center; justify-content: center; 
+    background: linear-gradient(135deg, var(--secondary) 0%, var(--primary-dark) 100%); 
+    position: fixed; top: 0; left: 0; width: 100%; z-index: 2000; 
+}
+.login-box { 
+    background: var(--bg-card); padding: 50px 40px; border-radius: var(--radius-lg); 
+    width: 90%; max-width: 420px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.3); 
+    animation: fadeIn 0.5s ease;
+}
+.logo-login { max-width: 140px; margin-bottom: 20px; display: block; margin: 0 auto; border-radius: 20px; }
+#login-form { display: flex; flex-direction: column; gap: 20px; margin-top: 20px; }
+.login-box input { width: 100%; padding: 16px; border-radius: var(--radius-md); border: 2px solid var(--border-color); background: #F8FAFC; font-size: 1rem; }
+.login-box button { padding: 16px; font-size: 1.1rem; border-radius: var(--radius-md); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+
+/* =========================================================
+   LAYOUT & SIDEBAR (COMPACTADA)
+   ========================================================= */
+#app-screen { display: flex; height: 100vh; width: 100%; }
+.sidebar { 
+    width: 250px; /* Levemente mais fina */
+    background: var(--secondary); color: #E2E8F0; 
+    display: flex; flex-direction: column; padding: 15px 12px; /* Reduzido */
+    box-shadow: 4px 0 15px rgba(0,0,0,0.05); z-index: 10; height: 100vh; 
+    flex-shrink: 0; justify-content: space-between; transition: width 0.3s ease;
+}
+.sidebar-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; } /* Reduzido */
+.brand { text-align: center; width: 100%; }
+.logo-sidebar { width: 60px; /* Menor para economizar espaço */ padding: 5px; background: white; border-radius: 12px; display: block; margin: 0 auto 5px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+.brand small { font-size: 0.75rem; color: #94A3B8; display: block; font-weight: 500; }
+#sidebar-toggle { background: transparent; color: #CBD5E1; font-size: 1.2rem; padding: 5px; }
+#sidebar-toggle:hover { color: white; transform: scale(1.1); }
+
+.sidebar.collapsed { width: 75px; align-items: center; }
+.sidebar.collapsed .sidebar-header { flex-direction: column; align-items: center; justify-content: center; width: 100%; }
+.sidebar.collapsed .brand { display: none; }
+.sidebar.collapsed .menu li span, .sidebar.collapsed .sidebar-footer button span { display: none; }
+.sidebar.collapsed .menu li, .sidebar.collapsed .sidebar-footer button { justify-content: center; padding: 12px 0; }
+.sidebar.collapsed .sidebar-footer button i { margin: 0; font-size: 1.2rem; }
+
+.menu { list-style: none; flex: 1; overflow-y: auto; overflow-x: hidden; margin-top: 5px; } 
+.menu li { 
+    padding: 10px 15px; margin-bottom: 4px; /* Mais compactos */
+    border-radius: var(--radius-md); 
+    cursor: pointer; display: flex; align-items: center; gap: 12px; 
+    font-weight: 500; color: #94A3B8; font-size: 0.85rem; /* Fonte um pouco menor */
+    transition: var(--transition); 
+}
+.menu li i { font-size: 1rem; width: 20px; text-align: center; }
+.menu li:hover { background: rgba(255,255,255, 0.08); color: white; transform: translateX(3px); }
+.menu li.active { 
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%); 
+    color: white; 
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4); 
+}
+
+.sidebar-footer { padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); width: 100%; }
+.sidebar-footer button { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; padding: 10px; font-size: 0.85rem; } /* Compactado */
+#btn-logout { background: rgba(239, 68, 68, 0.15); color: #FCA5A5; border-radius: var(--radius-md); }
+#btn-logout:hover { background: var(--danger); color: white; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4); }
+
+/* =========================================================
+   CONTEÚDO PRINCIPAL E TOP BAR
+   ========================================================= */
+.content { flex: 1; padding: 25px 35px; overflow-y: auto; background: var(--bg-app); scroll-behavior: smooth; }
+.top-bar { 
+    display: flex; justify-content: space-between; align-items: center; 
+    margin-bottom: 30px; background: var(--bg-card); padding: 15px 25px; 
+    border-radius: var(--radius-md); box-shadow: var(--shadow-sm); 
+    border: 1px solid var(--border-color); 
+}
+.date-control input[type="date"], .date-control input[type="month"] { 
+    padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); 
+    cursor: pointer; background: var(--bg-app); color: var(--text-main); font-family: 'Poppins', sans-serif;
+}
+
+.view { display: none; animation: fadeIn 0.4s ease; }
+.view.active { display: block; }
+
+/* =========================================================
+   CARDS E KPIs (Com efeitos hover)
+   ========================================================= */
+.card { 
+    background: var(--bg-card); padding: 25px; border-radius: var(--radius-lg); 
+    box-shadow: var(--shadow-md); margin-bottom: 25px; border: 1px solid var(--border-color); 
+    transition: var(--transition);
+}
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.kpi { 
+    display: flex; flex-direction: column; justify-content: center; padding: 25px; 
+    position: relative; overflow: hidden; border-radius: var(--radius-lg);
+    border-left: 5px solid var(--primary);
+}
+.kpi:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); }
+.kpi h3 { font-size: 1rem; color: var(--text-muted); font-weight: 600; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+.kpi span { font-size: 2rem; font-weight: 700; color: var(--text-main); }
+.kpi.danger { border-left-color: var(--danger); } .kpi.danger span { color: var(--danger); } 
+.kpi.success { border-left-color: var(--success); } .kpi.success span { color: var(--success); } 
+.kpi.warning { border-left-color: var(--warning); } .kpi.warning span { color: var(--warning); }
+
+.chart-container { height: 380px; display: flex; flex-direction: column; padding: 20px; }
+.canvas-wrapper { flex: 1; position: relative; width: 100%; overflow: hidden; margin-top: 10px; }
+
+/* =========================================================
+   FORMULÁRIOS E INPUTS (Com Focus Ring)
+   ========================================================= */
+.form-container { max-width: 1000px; margin: 0 auto; }
+.form-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px; }
+.form-group { flex: 1; min-width: 220px; }
+.form-group label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.9rem; color: var(--text-muted); }
+input, select { 
+    width: 100%; padding: 14px; border: 1px solid var(--border-color); 
+    background: var(--bg-app); border-radius: var(--radius-md); 
+    font-size: 0.95rem; color: var(--text-main); font-family: 'Poppins', sans-serif;
+    transition: var(--transition);
+}
+input:focus, select:focus { 
+    outline: none; border-color: var(--primary); background: var(--bg-card); 
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15); /* Efeito de anel ao clicar */
+}
+input[list] { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%2364748B" viewBox="0 0 16 16"><path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/></svg>'); background-repeat: no-repeat; background-position: right 15px center; background-size: 12px; cursor: pointer; }
+input[list]::-webkit-calendar-picker-indicator { display: none !important; opacity: 0 !important; }
+
+/* =========================================================
+   TABELAS (Estilo Card Moderno)
+   ========================================================= */
+.table-responsive { 
+    background: var(--bg-card); border-radius: var(--radius-lg); 
+    box-shadow: var(--shadow-md); overflow-x: auto; 
+    border: 1px solid var(--border-color);
+}
+table { width: 100%; border-collapse: collapse; min-width: 700px; }
+th { 
+    background: var(--bg-app); color: var(--text-muted); font-weight: 700; 
+    padding: 16px 20px; text-align: left; text-transform: uppercase; 
+    font-size: 0.75rem; letter-spacing: 0.5px; border-bottom: 2px solid var(--border-color); 
+}
+td { padding: 14px 20px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 0.9rem; font-weight: 500; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg-app); }
+td button { margin-right: 8px; vertical-align: middle; }
+input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); border-radius: 4px; }
+
+/* Badges (Etiquetas) */
+.badge { padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; display: inline-block; letter-spacing: 0.5px; }
+.badge-success { background: rgba(16, 185, 129, 0.15); color: #059669; }
+.badge-warning { background: rgba(245, 158, 11, 0.15); color: #D97706; }
+.badge-danger { background: rgba(239, 68, 68, 0.15); color: #DC2626; }
+body.dark-mode .badge-success { color: #34D399; }
+body.dark-mode .badge-warning { color: #FBBF24; }
+body.dark-mode .badge-danger { color: #F87171; }
+
+/* =========================================================
+   MODAIS E ALERTAS (Efeito Vidro/Desfoque)
+   ========================================================= */
+.modal-overlay { 
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; 
+    z-index: 2000; backdrop-filter: blur(5px); /* Desfoque no fundo */
+    animation: fadeIn 0.3s ease;
+}
+.modal-box { 
+    background: var(--bg-card); padding: 35px; border-radius: var(--radius-lg); 
+    width: 90%; max-width: 480px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); 
+    border: 1px solid var(--border-color); max-height: 90vh; overflow-y: auto; 
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slideUp { from { transform: translateY(30px) scale(0.95); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+
+.modal-box h3 { margin-bottom: 15px; color: var(--text-main); font-weight: 600; font-size: 1.3rem; }
+.custom-icon { font-size: 3.5rem; margin-bottom: 20px; display: block; text-align: center; }
+.custom-modal-content { text-align: center; }
+.icon-success { color: var(--success); }
+.icon-error { color: var(--danger); }
+.icon-warning { color: var(--warning); }
+.icon-info { color: var(--accent); }
+
+/* =========================================================
+   REGRAS DE BLOQUEIOS E PERFIS (VENDEDOR)
+   ========================================================= */
 body.perfil-vendedor #menu-funcionarios,
 body.perfil-vendedor li[data-target="dashboard"],
 body.perfil-vendedor li[data-target="gastos"],
@@ -38,113 +315,332 @@ body.perfil-vendedor #btn-del-cat {
     display: none !important;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Poppins', sans-serif; background: var(--bg-app); color: var(--text-main); height: 100vh; overflow: hidden; line-height: 1.5; }
-.hidden { display: none !important; }
+/* =========================================================
+   AJUSTES EXTRAS
+   ========================================================= */
+/* Cabeçalho de ordenação das tabelas */
+th.sortable { cursor: pointer; user-select: none; transition: var(--transition); }
+th.sortable:hover { background-color: var(--border-color); color: var(--primary); }
+th.sortable i { margin-left: 5px; font-size: 0.85em; opacity: 0.5; }
 
-button { font-family: 'Poppins', sans-serif; font-weight: 500; border-radius: var(--radius-md); cursor: pointer; border: none; transition: background 0.2s; }
-.btn-primary { background: var(--primary); color: white; padding: 10px 20px; box-shadow: var(--shadow-sm); }
-.btn-primary:hover { background: var(--primary-dark); }
+/* Carrinho de Vendas Específico */
+#tabela-carrinho { margin: 15px 0; border: 1px solid var(--border-color); width: 100%; border-collapse: collapse; border-radius: var(--radius-md); overflow: hidden; }
+#tabela-carrinho th { background: var(--bg-app); padding: 12px; font-size: 0.85rem; }
+#tabela-carrinho td { padding: 12px; font-size: 0.95rem; }
 
-/* BOTÃO VERDE (PAGAR) */
-.btn-success {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white; padding: 6px 14px; font-size: 0.85rem; border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2); width: auto !important;
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600;
+/* Rodapé Tabelas de Totais */
+tfoot tr { background-color: var(--bg-app); border-top: 2px solid var(--border-color); }
+tfoot td { padding: 15px; font-size: 1rem; color: var(--text-main); font-weight: 700; }
+
+/* =========================================================
+   BARRA FLUTUANTE DE AÇÕES EM MASSA (APAGAR SELECIONADOS)
+   ========================================================= */
+#bulk-actions, 
+#bulk-actions-gastos, 
+#bulk-actions-clientes, 
+#bulk-actions-estoque, 
+#bulk-actions-devedores {
+    /* Transforma a div em uma barra flutuante no centro-baixo da tela */
+    position: fixed !important;
+    bottom: 40px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    background: var(--bg-card) !important;
+    padding: 12px 25px !important;
+    border-radius: 50px !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25) !important;
+    border: 1px solid var(--border-color) !important;
+    z-index: 1000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    animation: popUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
 }
-.btn-success:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3); filter: brightness(1.1); }
-.btn-success:active { transform: translateY(0); }
 
-.btn-icon { border: none; background: transparent; cursor: pointer; font-size: 1rem; padding: 8px; border-radius: 50%; }
-.btn-edit { color: var(--primary); } .btn-delete { color: var(--danger); }
-.btn-edit:hover { background: #e0e7ff; } .btn-delete:hover { background: #fee2e2; }
-
-/* Botões de Massa */
-#bulk-actions-clientes button, #bulk-actions-historico button, #bulk-actions-estoque button, #bulk-actions-devedores button {
-    width: auto; height: auto; padding: 8px 16px; border-radius: var(--radius-md); white-space: nowrap;
+/* Garante que fique escondido quando nenhuma caixa estiver marcada */
+#bulk-actions.hidden, 
+#bulk-actions-gastos.hidden, 
+#bulk-actions-clientes.hidden, 
+#bulk-actions-estoque.hidden, 
+#bulk-actions-devedores.hidden {
+    display: none !important;
 }
-.error-msg { color: var(--danger); font-size: 0.9rem; margin-top: 10px; text-align: center; }
 
-/* LOGIN */
-#login-screen { height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--primary-dark), var(--primary)); position: fixed; top: 0; left: 0; width: 100%; z-index: 2000; }
-.login-box { background: var(--bg-card); padding: 50px 40px; border-radius: var(--radius-lg); width: 100%; max-width: 450px; text-align: center; box-shadow: var(--shadow-lg); }
-.logo-login { max-width: 150px; margin-bottom: 15px; display: block; margin: 0 auto; }
-#login-form { display: flex; flex-direction: column; gap: 20px; }
-.login-box input { width: 100%; padding: 15px; border-radius: var(--radius-md); border: 2px solid var(--border-color); background: #F8FAFC; }
-.login-box button { margin-top: 10px; padding: 15px; }
-
-/* LAYOUT SIDEBAR */
-#app-screen { display: flex; height: 100vh; width: 100%; }
-.sidebar { 
-    width: 250px; background: var(--secondary); color: #E2E8F0; 
-    display: flex; flex-direction: column; padding: 15px 10px; 
-    box-shadow: var(--shadow-lg); z-index: 10; height: 100vh; 
-    flex-shrink: 0; justify-content: space-between; transition: width 0.3s ease;
+/* Estilizando o botão vermelho lá dentro */
+#bulk-actions button, 
+#bulk-actions-gastos button, 
+#bulk-actions-clientes button, 
+#bulk-actions-estoque button, 
+#bulk-actions-devedores button {
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: var(--danger) !important;
+    padding: 10px 25px !important;
+    border-radius: 30px !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    transition: var(--transition) !important;
 }
-.sidebar-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
-.brand { text-align: center; width: 100%; }
-.logo-sidebar { width: 80px; padding: 5px; background: white; border-radius: 12px; display: block; margin: 0 auto 5px auto; }
-.brand small { font-size: 0.75rem; color: #94a3b8; display: block; }
-#sidebar-toggle { background: transparent; color: #cbd5e1; font-size: 1.2rem; padding: 5px; }
-#sidebar-toggle:hover { color: white; }
 
-.sidebar.collapsed { width: 70px; align-items: center; }
-.sidebar.collapsed .sidebar-header { flex-direction: column; align-items: center; justify-content: center; width: 100%; }
-.sidebar.collapsed .brand { display: none; }
-.sidebar.collapsed .menu li span { display: none; }
-.sidebar.collapsed .sidebar-footer button span { display: none; }
-.sidebar.collapsed .menu li { justify-content: center; padding: 15px 0; }
-.sidebar.collapsed .sidebar-footer button { justify-content: center; padding: 15px 0; }
-.sidebar.collapsed .sidebar-footer button i { margin: 0; font-size: 1.2rem; }
+/* Adiciona automaticamente um ícone de lixeira antes do texto */
+#bulk-actions button:before, 
+#bulk-actions-gastos button:before, 
+#bulk-actions-clientes button:before, 
+#bulk-actions-estoque button:before, 
+#bulk-actions-devedores button:before {
+    content: "\f2ed"; /* Código do ícone de lixeira do FontAwesome */
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+}
 
-.menu { list-style: none; flex: 1; overflow-y: auto; overflow-x: hidden; } 
-.menu li { padding: 10px 15px; margin-bottom: 4px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 10px; font-weight: 500; color: #CBD5E1; font-size: 0.95rem; transition: all 0.2s; }
-.menu li:hover { background: rgba(255,255,255, 0.05); color: white; }
-.menu li.active { background: var(--primary); color: white; }
-.sidebar-footer { padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); width: 100%; }
-.sidebar-footer button { display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.3s; }
-#btn-logout { background: rgba(239, 68, 68, 0.1); color: var(--danger); padding: 10px; font-weight: 600; }
-#btn-logout:hover { background: var(--danger); color: white; }
+/* Efeito ao passar o mouse por cima do botão de apagar */
+#bulk-actions button:hover, 
+#bulk-actions-gastos button:hover, 
+#bulk-actions-clientes button:hover, 
+#bulk-actions-estoque button:hover, 
+#bulk-actions-devedores button:hover {
+    background: var(--danger) !important;
+    color: #FFFFFF !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4) !important;
+}
 
-/* CONTEÚDO */
-.content { flex: 1; padding: 20px 30px; overflow-y: auto; background: var(--bg-app); }
-.top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--bg-card); padding: 15px 25px; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1px solid var(--border-color); }
-.date-control input[type="date"], .date-control input[type="month"] { padding: 8px; border: 2px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; background: var(--bg-card); color: var(--text-main); }
+/* Animação tipo "pulo" ao aparecer na tela */
+@keyframes popUp {
+    from { bottom: 0; opacity: 0; transform: translate(-50%, 20px); }
+    to { bottom: 40px; opacity: 1; transform: translate(-50%, 0); }
+}
 
-.view { display: none; }
-.view.active { display: block; }
+/* =========================================================
+   CORREÇÃO DE ESPAÇAMENTO NOS MODAIS DE CONFIRMAÇÃO
+   ========================================================= */
+.modal-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 25px; /* Empurra os botões para longe do texto */
+    justify-content: space-between;
+    width: 100%;
+}
 
-.card { background: var(--bg-card); padding: 25px; border-radius: var(--radius-lg); box-shadow: var(--shadow-md); margin-bottom: 25px; border: 1px solid var(--border-color); }
-.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 25px; }
-.kpi { display: flex; flex-direction: column; justify-content: center; padding: 20px; position: relative; overflow: hidden; }
-.kpi span { font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
-.kpi.danger span { color: var(--danger); } .kpi.success span { color: var(--success); } .kpi.warning span { color: var(--warning); }
-.chart-container { height: 350px; display: flex; flex-direction: column; }
-.canvas-wrapper { flex: 1; position: relative; width: 100%; overflow: hidden; }
+.modal-actions button {
+    flex: 1; /* Faz os botões "Sim" e "Não" dividirem o espaço igualmente */
+    padding: 12px !important;
+    font-size: 1rem;
+}
 
-/* Forms */
-.form-container { max-width: 900px; margin: 0 auto; }
-.form-row { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; }
-.form-group { flex: 1; min-width: 200px; }
-.form-group label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9rem; color: var(--text-main); }
-input, select { width: 100%; padding: 12px; border: 2px solid var(--border-color); background: #F8FAFC; border-radius: var(--radius-md); font-size: 0.95rem; color: var(--text-main); }
-input:focus, select:focus { outline: none; border-color: var(--primary); background: var(--bg-card); }
-input[list] { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%234F46E5" viewBox="0 0 16 16"><path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/></svg>'); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; cursor: pointer; }
-input[list]::-webkit-calendar-picker-indicator { display: none !important; opacity: 0 !important; }
+#confirm-msg, #prompt-msg {
+    margin: 15px 0 20px 0 !important;
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    word-wrap: break-word; /* Evita que o texto quebre o layout */
+}
 
-/* Tabelas */
-.table-responsive { background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: 5px; overflow-x: auto; }
-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 600px; }
-th { background: #F8FAFC; color: var(--text-muted); font-weight: 600; padding: 15px; text-align: left; text-transform: uppercase; font-size: 0.8rem; border-bottom: 2px solid var(--border-color); }
-td { padding: 12px 15px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 0.9rem; }
-tr:hover td { background: #F8FAFC; }
-td button { margin-right: 5px; vertical-align: middle; }
-input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); }
-.badge { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; display: inline-block; }
-.badge-success { background: #DCFCE7; color: #166534; }
-.badge-warning { background: #FEF9C3; color: #854D0E; }
-.badge-danger { background: #fee2e2; color: #dc2626; }
+/* =========================================================
+   CORREÇÕES VISUAIS: MODAL DE GASTOS E NOVA VENDA
+   ========================================================= */
 
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(2px); }
-.modal-box { background: var(--bg-card); padding: 30px; border-radius: var(--radius-lg); width: 90%; max-width: 450px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); max-height: 90vh; overflow-y: auto; }
+/* 1. Aumenta significativamente a largura do Modal de Edição de Despesas */
+#modal-gasto-edit .modal-box {
+    max-width: 850px !important;
+}
+
+/* 2. Força os títulos e o fundo da Tabela do Carrinho a respeitarem o Tema Escuro */
+#tabela-carrinho th {
+    background: var(--bg-app) !important;
+    color: var(--text-muted) !important;
+    border-bottom: 2px solid var(--border-color) !important;
+}
+
+#tabela-carrinho td {
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+/* =========================================================
+   BARRA FLUTUANTE: ABA DE FUNCIONÁRIOS
+   ========================================================= */
+#bulk-actions-funcionarios {
+    position: fixed !important;
+    bottom: 40px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    background: var(--bg-card) !important;
+    padding: 12px 25px !important;
+    border-radius: 50px !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25) !important;
+    border: 1px solid var(--border-color) !important;
+    z-index: 1000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    animation: popUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+#bulk-actions-funcionarios.hidden { display: none !important; }
+
+#bulk-actions-funcionarios button {
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: var(--danger) !important;
+    padding: 10px 25px !important;
+    border-radius: 30px !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    transition: var(--transition) !important;
+}
+
+#bulk-actions-funcionarios button:before {
+    content: "\f2ed";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+}
+
+#bulk-actions-funcionarios button:hover {
+    background: var(--danger) !important;
+    color: #FFFFFF !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4) !important;
+}
+
+@media (max-width: 768px) {
+    #bulk-actions-funcionarios {
+        bottom: 95px !important;
+        width: 90% !important;
+        padding: 10px 15px !important;
+    }
+}
+
+/* =========================================================
+   RESPONSIVIDADE: MODO APLICATIVO (MOBILE)
+   ========================================================= */
+@media (max-width: 768px) {
+    /* 1. Layout Base */
+    #app-screen { flex-direction: column; }
+    .content { 
+        padding: 15px; 
+        padding-bottom: 90px; /* Espaço para o menu não tampar o conteúdo no final */
+    }
+    
+    /* 2. Menu Transformado em "Bottom Tab Bar" (Menu de App) */
+    .sidebar {
+        position: fixed;
+        bottom: 0; left: 0;
+        width: 100%; height: 80px;
+        flex-direction: row;
+        align-items: center;
+        padding: 0 10px;
+        z-index: 2000;
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+        overflow-x: auto; /* Permite arrastar os menus pro lado */
+        -ms-overflow-style: none; scrollbar-width: none; /* Esconde a barra de rolagem */
+    }
+    .sidebar::-webkit-scrollbar { display: none; }
+    
+    .sidebar-header { display: none; } /* Esconde Logo e botão de abrir menu */
+    
+    /* Organizando os botões do Menu */
+    .menu { 
+        display: flex; flex-direction: row; 
+        margin: 0; overflow: visible; gap: 8px;
+    }
+    .menu li {
+        flex-direction: column; gap: 6px;
+        padding: 10px 5px; min-width: 80px;
+        border-radius: 12px; margin: 0;
+        justify-content: center; align-items: center;
+    }
+    .menu li i { font-size: 1.3rem; width: auto; }
+    .menu li span { display: block; font-size: 0.65rem; text-align: center; }
+    
+    /* Puxando o botão de Backup, Planilha e Sair para a mesma linha do menu */
+    .sidebar-footer {
+        display: flex; flex-direction: row; gap: 8px;
+        padding: 0; border: none; margin-left: 8px;
+    }
+    .sidebar-footer div { display: none; } /* Esconde divisória */
+    
+    .sidebar-footer button {
+        flex-direction: column; gap: 6px;
+        padding: 10px 5px !important; min-width: 80px;
+        height: 100%; margin: 0 !important;
+        border-radius: 12px;
+        justify-content: center; align-items: center;
+    }
+    .sidebar-footer button i { font-size: 1.3rem; margin: 0; }
+    .sidebar-footer button span { display: block; font-size: 0.65rem; text-align: center; }
+    
+    /* Truque: Trocar o nome gigante do botão do Excel por um texto menor */
+    .sidebar-footer .btn-success { font-size: 0 !important; }
+    .sidebar-footer .btn-success::after { 
+        content: 'Baixar Excel'; font-size: 0.65rem; 
+        display: block; font-family: 'Poppins', sans-serif; margin-top: 6px;
+    }
+    
+    /* 3. Ajuste do Cabeçalho e Filtros (Top Bar) */
+    .top-bar { flex-direction: column; align-items: stretch; gap: 15px; }
+    .top-bar > div { width: 100%; justify-content: space-between; }
+    .date-control { flex-direction: column; align-items: stretch !important; }
+    #filtro-periodo-geral { flex-direction: column; gap: 10px; }
+    #filtro-periodo-geral input { width: 100%; }
+    
+    /* 4. Formulários ocupando 100% da tela (Fácil de digitar) */
+    .form-row { flex-direction: column; gap: 15px; }
+    .form-group { width: 100% !important; flex: none !important; }
+    
+    /* 5. Tabelas: Indicação Visual de Rolagem */
+    .table-responsive { position: relative; border-radius: 12px; }
+    .table-responsive::before {
+        content: 'Arraste a tabela para o lado 👉';
+        display: block; text-align: center;
+        font-size: 0.75rem; font-weight: 600;
+        color: var(--primary); padding: 8px;
+        background: rgba(79, 70, 229, 0.05);
+    }
+    
+    /* 6. Cards / Dashboard */
+    .kpi-grid { grid-template-columns: 1fr; gap: 15px; }
+    .chart-container { height: 320px; }
+    
+    /* 7. Ajuste Modais (Telas flutuantes) */
+    .modal-box { padding: 25px 20px; width: 95%; max-height: 85vh; }
+    .login-box { padding: 40px 25px; }
+
+    /* 8. Ajuste das Barras Flutuantes (Para não ficar embaixo do novo menu) */
+    #bulk-actions, #bulk-actions-gastos, #bulk-actions-clientes, #bulk-actions-estoque, #bulk-actions-devedores {
+        bottom: 95px !important; /* Flutua logo acima do menu inferior */
+        width: 90% !important;
+        padding: 10px 15px !important;
+    }
+}
+
+/* Correção do alinhamento dos Filtros de Data */
+#filtro-periodo-geral {
+    display: flex;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Tamanhos Personalizados para Modais Grandes */
+#modal-cliente-edit .modal-box {
+    max-width: 800px !important; /* Espaço de sobra para o formulário */
+}
+
+#modal-devedor .modal-box {
+    max-width: 650px !important; /* Evita que a data quebre linha */
+}
+
+/* Melhoria no visual das caixas de busca (Datalist) */
+input[list] {
+    background-color: rgba(79, 70, 229, 0.05);
+    border: 2px solid var(--border-color);
+    font-weight: 600;
+}
+input[list]:focus {
+    background-color: var(--bg-card);
+}

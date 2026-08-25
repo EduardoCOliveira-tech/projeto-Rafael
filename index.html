@@ -195,10 +195,10 @@
                         </table>
                     </div>
 
-                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div style="background: var(--bg-app); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
                         <div class="form-row">
                             <div class="form-group" style="flex: 2;"><label>Cliente</label><input list="list-clientes-venda" id="venda-cliente" placeholder="Buscar..." value="Consumidor Final"><datalist id="list-clientes-venda"></datalist></div>
-                            <div class="form-group" style="flex: 2; border: 1px dashed #cbd5e1; padding: 10px; border-radius: 8px;">
+                            <div class="form-group" style="flex: 2; border: 2px dashed var(--border-color); padding: 10px; border-radius: 8px;">
                                 <label>Pagamento</label>
                                 <div style="display: flex; gap: 5px; margin-bottom: 5px;">
                                     <select id="venda-metodo" style="flex: 1;"></select>
@@ -242,6 +242,9 @@
                         <button type="submit" class="btn-primary" style="width:100%; margin-top: 10px;">Registrar Gasto</button>
                     </form>
                 </div>
+                <div style="margin: 15px 0 10px 0;">
+                    <input type="text" id="busca-gastos" placeholder="🔍 Pesquisar despesas..." onkeyup="window.filtrarGastos()" style="padding: 10px; width: 100%;">
+                </div>
                 <div class="table-responsive">
                     <table id="tabela-gastos">
                         <thead><tr><th style="width:30px"><input type="checkbox" id="select-all-gastos"></th><th class="sortable" onclick="window.ordenarTabela('gastos', 'dataEntrada')">Data <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('gastos', 'nome')">Descrição <i class="fas fa-sort"></i></th><th>Banco</th><th>Método</th><th>Vencimento</th><th class="sortable" onclick="window.ordenarTabela('gastos', 'valor')">Valor <i class="fas fa-sort"></i></th><th>Status</th><th>Ação</th></tr></thead>
@@ -278,7 +281,7 @@
                     </form>
                 </div>
                 <div style="margin-bottom: 10px;"><input type="text" id="busca-clientes" placeholder="🔍 Pesquisar..." onkeyup="window.filtrarClientes()" style="padding: 10px; width: 100%;"></div>
-                <div class="table-responsive"><table id="tabela-clientes"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-cli"></th><th class="sortable" onclick="window.ordenarTabela('clientes', 'nome')">Nome <i class="fas fa-sort"></i></th><th>Telefone</th><th>CPF</th><th>Ação</th></tr></thead><tbody></tbody></table></div>
+                <div class="table-responsive"><table id="tabela-clientes"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-cli"></th><th class="sortable" onclick="window.ordenarTabela('clientes', 'nome')">Nome <i class="fas fa-sort"></i></th><th>Telefone</th><th>CPF/CNPJ</th><th>Insc. Est.</th><th>Endereço</th><th>Bairro</th><th>Cidade</th><th>UF</th><th>Ação</th></tr></thead><tbody></tbody></table></div>
             </section>
 
             <section id="historico" class="view">
@@ -342,7 +345,13 @@
                 <div class="table-responsive"><table id="tabela-devedores"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-dev"></th><th class="sortable" onclick="window.ordenarTabela('devedores', 'nome')">Cliente <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('devedores', 'total')">Total Devendo <i class="fas fa-sort"></i></th><th>Ações</th></tr></thead><tbody></tbody></table></div>
             </section>
             <section id="funcionarios" class="view">
-                <h2>Gerenciar Funcionários</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>Gerenciar Funcionários</h2>
+                    <div id="bulk-actions-funcionarios" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;">
+                        <button onclick="window.excluirMassaFuncionarios()" class="btn-icon" style="color: #dc2626;">Apagar Selecionados</button>
+                    </div>
+                </div>
+                
                 <div class="card form-container" style="margin-top: 15px;">
                     <form id="form-funcionario">
                         <div class="form-row">
@@ -362,9 +371,22 @@
                         <button type="submit" class="btn-primary" style="margin-top: 10px; width: 100%;">Cadastrar Funcionário</button>
                     </form>
                 </div>
-                <div class="table-responsive" style="margin-top: 20px;">
+                
+                <!-- Barra de Pesquisa e Filtro de Perfil -->
+                <div style="display: flex; gap: 10px; margin-top: 20px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;">
+                    <input type="text" id="busca-funcionarios" placeholder="🔍 Pesquisar por nome ou e-mail..." onkeyup="window.filtrarFuncionarios()" style="flex: 2; padding: 12px; min-width: 200px;">
+                    <select id="filtro-perfil-func" onchange="window.filtrarFuncionarios()" style="flex: 1; padding: 12px; min-width: 150px;">
+                        <option value="">Todos os Perfis</option>
+                        <option value="GERENTE">Gerentes</option>
+                        <option value="VENDEDOR">Vendedores</option>
+                        <option value="REVOGADO">Inativos/Revogados</option>
+                    </select>
+                </div>
+                
+                <!-- Tabela Única -->
+                <div class="table-responsive">
                     <table id="tabela-funcionarios">
-                        <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Ação</th></tr></thead>
+                        <thead><tr><th style="width:30px"><input type="checkbox" id="select-all-func"></th><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Ação</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>

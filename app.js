@@ -321,7 +321,7 @@ function renderizarTabelaClientes() {
     if(!tbody) return;
     let htmlBuffer = '';
     clientesCache.forEach(c => {
-        htmlBuffer += `<tr><td style="text-align:center"><input type="checkbox" class="cli-checkbox" value="${c.id}"></td><td>${c.nome}</td><td>${c.tel||'-'}</td><td>${c.cpf||'-'}</td><td><button onclick="window.abrirEditarCliente('${c.id}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button><button onclick="window.excluirCliente('${c.id}')" class="btn-icon btn-delete"><i class="fas fa-trash"></i></button></td></tr>`;
+        htmlBuffer += `<tr><td style="text-align:center"><input type="checkbox" class="cli-checkbox" value="${c.id}"></td><td>${c.nome}</td><td>${c.tel||'-'}</td><td>${c.cpf||'-'}</td><td>${c.ie||'-'}</td><td>${c.endereco||'-'}</td><td>${c.bairro||'-'}</td><td>${c.cidade||'-'}</td><td>${c.uf||'-'}</td><td><button onclick="window.abrirEditarCliente('${c.id}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button><button onclick="window.excluirCliente('${c.id}')" class="btn-icon btn-delete"><i class="fas fa-trash"></i></button></td></tr>`;
     });
     tbody.innerHTML = htmlBuffer;
     configurarCheckboxes('select-all-cli', 'cli-checkbox', 'bulk-actions-clientes', null);
@@ -444,45 +444,48 @@ function renderizarTabelaHistorico() {
 
 // --- DASHBOARD (ATUALIZADO - TOTAL DIÁRIO) ---
 async function carregarDashboard() {
-    const i = new Date(document.getElementById('data-inicio').value + 'T00:00:00'); 
-    const f = new Date(document.getElementById('data-fim').value + 'T23:59:59');
+    window.mostrarLoading(true); // <-- Liga o carregamento
     
-    const qV = query(collection(db, COLECAO_VENDAS), where("data", ">=", Timestamp.fromDate(i)), where("data", "<=", Timestamp.fromDate(f)));
-    const qG = query(collection(db, COLECAO_GASTOS), where("dataEntrada", ">=", Timestamp.fromDate(i)), where("dataEntrada", "<=", Timestamp.fromDate(f)));
-    const qFiadoTotal = query(collection(db, COLECAO_VENDAS), where("pago", "==", false));
-    
-    const [sv, sg, sf] = await Promise.all([getDocs(qV), getDocs(qG), getDocs(qFiadoTotal)]);
-    
-    let fat = 0, custo = 0, gastos = 0;
-    
-    // Objeto para agregar o total por dia
-    const mapVendasDia = {}; 
+    try {
+        const i = new Date(document.getElementById('data-inicio').value + 'T00:00:00'); 
+        const f = new Date(document.getElementById('data-fim').value + 'T23:59:59');
+        
+        const qV = query(collection(db, COLECAO_VENDAS), where("data", ">=", Timestamp.fromDate(i)), where("data", "<=", Timestamp.fromDate(f)));
+        const qG = query(collection(db, COLECAO_GASTOS), where("dataEntrada", ">=", Timestamp.fromDate(i)), where("dataEntrada", "<=", Timestamp.fromDate(f)));
+        const qFiadoTotal = query(collection(db, COLECAO_VENDAS), where("pago", "==", false));
+        
+        const [sv, sg, sf] = await Promise.all([getDocs(qV), getDocs(qG), getDocs(qFiadoTotal)]);
+        
+        let fat = 0, custo = 0, gastos = 0;
+        const mapVendasDia = {}; 
 
-    sv.forEach(d => { 
-        const v = d.data(); 
-        if(v.produtoNome !== "PAGAMENTO DÍVIDA"){ 
-            fat += v.total; 
-            custo += v.custo || 0; 
-            
-            // Agrega valor no dia
-            const dia = v.data.toDate().toLocaleDateString('pt-BR').slice(0, 5); // dd/mm
-            mapVendasDia[dia] = (mapVendasDia[dia] || 0) + v.total;
-        } 
-    });
-    
-    sg.forEach(d => gastos += d.data().valor);
-    
-    let fiadoGeral = 0; 
-    sf.forEach(d => { fiadoGeral += d.data().total; });
-    
-    // Atualiza KPIs
-    document.getElementById('kpi-faturamento').innerText = `R$ ${fat.toFixed(2)}`; 
-    document.getElementById('kpi-fiado').innerText = `R$ ${fiadoGeral.toFixed(2)}`; 
-    document.getElementById('kpi-gastos').innerText = `R$ ${gastos.toFixed(2)}`; 
-    document.getElementById('kpi-lucro').innerText = `R$ ${(fat-gastos).toFixed(2)}`;
-    
-    // Chama renderização do novo gráfico simples
-    renderDailySalesChart(mapVendasDia);
+        sv.forEach(d => { 
+            const v = d.data(); 
+            if(v.produtoNome !== "PAGAMENTO DÍVIDA"){ 
+                fat += v.total; 
+                custo += v.custo || 0; 
+                
+                const dia = v.data.toDate().toLocaleDateString('pt-BR').slice(0, 5); 
+                mapVendasDia[dia] = (mapVendasDia[dia] || 0) + v.total;
+            } 
+        });
+        
+        sg.forEach(d => gastos += d.data().valor);
+        
+        let fiadoGeral = 0; 
+        sf.forEach(d => { fiadoGeral += d.data().total; });
+        
+        document.getElementById('kpi-faturamento').innerText = `R$ ${fat.toFixed(2)}`; 
+        document.getElementById('kpi-fiado').innerText = `R$ ${fiadoGeral.toFixed(2)}`; 
+        document.getElementById('kpi-gastos').innerText = `R$ ${gastos.toFixed(2)}`; 
+        document.getElementById('kpi-lucro').innerText = `R$ ${(fat-gastos).toFixed(2)}`;
+        
+        renderDailySalesChart(mapVendasDia);
+    } catch (e) {
+        console.error("Erro ao carregar Dashboard: ", e);
+    } finally {
+        window.mostrarLoading(false); // <-- Desliga o carregamento quando termina
+    }
 }
 window.carregarDashboard = carregarDashboard;
 
@@ -650,7 +653,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnTheme = document.getElementById('theme-toggle');
     if(btnTheme) {
         if (localStorage.getItem('theme') === 'dark') { document.body.classList.add('dark-mode'); btnTheme.querySelector('i').classList.replace('fa-moon', 'fa-sun'); }
-        btnTheme.onclick = (e) => { e.preventDefault(); document.body.classList.toggle('dark-mode'); localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); btnTheme.querySelector('i').classList.replace(document.body.classList.contains('dark-mode') ? 'fa-moon' : 'fa-sun', document.body.classList.contains('dark-mode') ? 'fa-sun' : 'fa-moon'); updateChartsTheme(); };
+        btnTheme.onclick = (e) => { e.preventDefault(); document.body.classList.toggle('dark-mode'); localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); btnTheme.querySelector('i').classList.replace(document.body.classList.contains('dark-mode') ? 'fa-moon' : 'fa-sun', document.body.classList.contains('dark-mode') ? 'fa-sun' : 'fa-moon'); };
     }
 
     // 5. Botões Estáticos
@@ -1173,7 +1176,6 @@ window.finalizarVendaCarrinho = async () => {
     if(temFiado && (!cliente || cliente === 'Consumidor Final')) 
         return window.mostrarAlerta("Erro", "Fiado exige cliente identificado!", "error");
 
-    const desejaImprimir = confirm("Venda registrada! Deseja imprimir a Nota de Venda?");
     
     window.mostrarLoading(true);
     const batch = writeBatch(db); 
@@ -1242,17 +1244,27 @@ window.finalizarVendaCarrinho = async () => {
         await batch.commit();
         
         window.mostrarLoading(false); 
-        window.mostrarAlerta("Sucesso", "Venda Finalizada!", "success");
-
-        if (desejaImprimir) {
+        
+        // Novo modal elegante para perguntar da impressão!
+        window.mostrarConfirmacao("Venda Finalizada!", "A venda foi salva com sucesso. Deseja imprimir a Nota de Venda agora?", () => {
             window.imprimirNota({ id: idVendaGeral, cliente: cliente, data: dataFinal, metodo: metodoString }, itensParaImpressao);
-        }
+        });
 
         carrinho = []; 
         pagamentosVenda = []; 
         window.atualizarInfoPagamento(); 
         renderizarCarrinho(); 
         carregarEstoque();
+
+        // --- NOVA LÓGICA: VOLTAR OS CAMPOS PARA O PADRÃO ---
+        document.getElementById('venda-cliente').value = 'Consumidor Final'; // Volta pro cliente padrão
+        document.getElementById('venda-data').valueAsDate = new Date(); // Volta para o dia de hoje
+        const selectMetodo = document.getElementById('venda-metodo');
+        if (selectMetodo) selectMetodo.selectedIndex = 0; // Volta para o primeiro método (Ex: Dinheiro)
+        const inputParcial = document.getElementById('valor-pagamento-parcial');
+        if (inputParcial) inputParcial.value = ''; // Limpa a caixa de valor pago
+        document.getElementById('venda-produto').focus(); // Já deixa o mouse piscando no produto para a próxima venda!
+
     } catch (e) { 
         console.error(e); 
         window.mostrarLoading(false); 
@@ -1570,12 +1582,9 @@ window.filtrarEstoque = () => { const t = document.getElementById('busca-estoque
 window.filtrarHistorico = () => { const t = document.getElementById('busca-historico').value.toLowerCase(); document.querySelectorAll('#tabela-historico tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
 window.filtrarClientes = () => { const t = document.getElementById('busca-clientes').value.toLowerCase(); document.querySelectorAll('#tabela-clientes tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
 window.filtrarDevedores = () => { const t = document.getElementById('busca-devedores').value.toLowerCase(); document.querySelectorAll('#tabela-devedores tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
-window.excluirMassaClientes=async()=>{const c=document.querySelectorAll('.cli-checkbox:checked');if(c.length===0)return;window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} clientes?`, async()=>{window.mostrarLoading(true);for(const x of c)await deleteDoc(doc(db,COLECAO_CLIENTES,x.value));window.mostrarLoading(false);window.carregarClientes();});};
 window.excluirCliente=async(id)=>{window.mostrarConfirmacao("Apagar?", "Excluir cliente?", async()=>{await deleteDoc(doc(db,COLECAO_CLIENTES,id));window.carregarClientes();});};
-window.excluirMassa=async()=>{const c=document.querySelectorAll('.sale-checkbox:checked');if(c.length===0)return;window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} registros?`, async()=>{window.mostrarLoading(true);for(const x of c){try{await deleteDoc(doc(db,COLECAO_VENDAS,x.value));const pid=x.dataset.pid;const q=parseInt(x.dataset.qtd);if(pid&&pid.length>10&&!isNaN(q))await updateDoc(doc(db,COLECAO_PRODUTOS,pid),{qtd:increment(q)});}catch(e){}}window.mostrarLoading(false);window.carregarHistorico();});};
 window.abrirEdicao=(id,v,m)=>{document.getElementById('edit-id').value=id;document.getElementById('edit-valor').value=v;document.getElementById('edit-metodo').value=m;document.getElementById('modal-editar').classList.remove('hidden');};
 window.salvarEdicaoVenda=async()=>{const id=document.getElementById('edit-id').value;const m=document.getElementById('edit-metodo').value;const valor=parseFloat(document.getElementById('edit-valor').value);const isAbatimento=valor<0;const isPago=isAbatimento?false:(m!=='aver');await updateDoc(doc(db,COLECAO_VENDAS,id),{total:valor,metodo:m,pago:isPago});window.fecharModalEdicao();window.carregarHistorico();};
-window.excluirMassaDevedores=async()=>{const c=document.querySelectorAll('.dev-checkbox:checked');if(c.length===0)return;window.mostrarConfirmacao("Perdoar?", `Zerar ${c.length} clientes?`, async()=>{window.mostrarLoading(true);for(const x of c){const n=x.value;const s=await getDocs(query(collection(db,COLECAO_VENDAS),where("cliente","==",n),where("pago","==",false)));s.forEach(async d=>await deleteDoc(doc(db,COLECAO_VENDAS,d.id)));}window.mostrarLoading(false);window.mostrarAlerta("Sucesso","Dívidas perdoadas!","success");window.carregarDevedores();});};
 window.abrirModalBancos = () => document.getElementById('modal-bancos').classList.remove('hidden');
 window.adicionarBanco = async () => { const n = document.getElementById('novo-banco-nome').value.trim(); if(n) { await addDoc(collection(db, COLECAO_BANCOS), { nome: n }); document.getElementById('novo-banco-nome').value = ''; window.carregarBancos(); } };
 window.removerBanco = async (id) => { window.mostrarConfirmacao("Excluir Banco?", "Essa ação não pode ser desfeita.", async () => { await deleteDoc(doc(db, COLECAO_BANCOS, id)); window.carregarBancos(); }); };
@@ -1586,7 +1595,6 @@ window.toggleCamposPagamento = (idSelect, idContainer) => {
     else container.classList.add('hidden');
 };
 window.excluirGasto = async (id) => { window.mostrarConfirmacao("Excluir?", "Deseja remover essa despesa?", async () => { await deleteDoc(doc(db, COLECAO_GASTOS, id)); window.carregarGastos(); }); };
-window.excluirMassaGastos = async () => { const c = document.querySelectorAll('.gasto-checkbox:checked'); if(c.length === 0) return; window.mostrarConfirmacao("Excluir em Massa", `Apagar ${c.length} despesas?`, async () => { window.mostrarLoading(true); for(const x of c) { try { await deleteDoc(doc(db, COLECAO_GASTOS, x.value)); } catch(e) {} } window.mostrarLoading(false); window.carregarGastos(); }); };
 window.abrirEditarGasto = async (id) => {
     const docSnap = await getDoc(doc(db, COLECAO_GASTOS, id));
     if (docSnap.exists()) {
@@ -2093,7 +2101,12 @@ window.imprimirNota = async (venda, itensCarrinho) => {
     window.open(doc.output('bloburl'), '_blank'); // Para abrir em nova aba e imprimir
 };
 
-window.excluirMassaEstoque = async () => { const c = document.querySelectorAll('.stock-checkbox:checked'); if(c.length===0) return; window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} produtos?`, async () => { window.mostrarLoading(true); for(const x of c) await deleteDoc(doc(db, COLECAO_PRODUTOS, x.value)); window.mostrarLoading(false); window.carregarEstoque(); }); };
+// ATUALIZAÇÃO: ESCONDE BARRA E DESMARCA O "MARCAR TODOS"
+window.excluirMassaClientes = async () => { const c = document.querySelectorAll('.cli-checkbox:checked'); if(c.length===0) return; window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} clientes?`, async()=>{ window.mostrarLoading(true); for(const x of c) await deleteDoc(doc(db,COLECAO_CLIENTES,x.value)); window.mostrarLoading(false); document.getElementById('select-all-cli').checked = false; document.getElementById('bulk-actions-clientes').classList.add('hidden'); window.carregarClientes(); }); };
+window.excluirMassa = async () => { const c = document.querySelectorAll('.sale-checkbox:checked'); if(c.length===0) return; window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} registros?`, async()=>{ window.mostrarLoading(true); for(const x of c){ try{ await deleteDoc(doc(db,COLECAO_VENDAS,x.value)); const pid = x.dataset.pid; const q = parseInt(x.dataset.qtd); if(pid && pid.length>10 && !isNaN(q)) await updateDoc(doc(db,COLECAO_PRODUTOS,pid),{qtd:increment(q)}); }catch(e){} } window.mostrarLoading(false); document.getElementById('select-all').checked = false; document.getElementById('bulk-actions').classList.add('hidden'); window.carregarHistorico(); }); };
+window.excluirMassaDevedores = async () => { const c = document.querySelectorAll('.dev-checkbox:checked'); if(c.length===0) return; window.mostrarConfirmacao("Perdoar?", `Zerar ${c.length} clientes?`, async()=>{ window.mostrarLoading(true); for(const x of c){ const n = x.value; const s = await getDocs(query(collection(db,COLECAO_VENDAS),where("cliente","==",n),where("pago","==",false))); s.forEach(async d => await deleteDoc(doc(db,COLECAO_VENDAS,d.id))); } window.mostrarLoading(false); window.mostrarAlerta("Sucesso","Dívidas perdoadas!","success"); document.getElementById('select-all-dev').checked = false; document.getElementById('bulk-actions-devedores').classList.add('hidden'); window.carregarDevedores(); }); };
+window.excluirMassaGastos = async () => { const c = document.querySelectorAll('.gasto-checkbox:checked'); if(c.length === 0) return; window.mostrarConfirmacao("Excluir em Massa", `Apagar ${c.length} despesas?`, async () => { window.mostrarLoading(true); for(const x of c) { try { await deleteDoc(doc(db, COLECAO_GASTOS, x.value)); } catch(e) {} } window.mostrarLoading(false); document.getElementById('select-all-gastos').checked = false; document.getElementById('bulk-actions-gastos').classList.add('hidden'); window.carregarGastos(); }); };
+window.excluirMassaEstoque = async () => { const c = document.querySelectorAll('.stock-checkbox:checked'); if(c.length===0) return; window.mostrarConfirmacao("Apagar?", `Excluir ${c.length} produtos?`, async () => { window.mostrarLoading(true); for(const x of c) await deleteDoc(doc(db, COLECAO_PRODUTOS, x.value)); window.mostrarLoading(false); document.getElementById('select-all-stock').checked = false; document.getElementById('bulk-actions-estoque').classList.add('hidden'); window.carregarEstoque(); }); };
 window.excluirProduto = async (id) => { window.mostrarConfirmacao("Excluir?", "Apagar produto?", async () => { await deleteDoc(doc(db, COLECAO_PRODUTOS, id)); window.carregarEstoque(); }); };
 window.abrirEditarProduto = async (id) => { const p = produtosCache.find(x => x.id === id); if(p) { document.getElementById('edit-prod-id').value = id; document.getElementById('edit-prod-nome').value = p.nome; document.getElementById('edit-prod-custo').value = p.custo; document.getElementById('edit-prod-venda').value = p.venda; document.getElementById('edit-prod-qtd').value = p.qtd; document.getElementById('modal-prod').classList.remove('hidden'); } };
 window.salvarEdicaoProduto = async () => { const id = document.getElementById('edit-prod-id').value; window.mostrarLoading(true); await updateDoc(doc(db, COLECAO_PRODUTOS, id), { nome: document.getElementById('edit-prod-nome').value, custo: parseFloat(document.getElementById('edit-prod-custo').value), venda: parseFloat(document.getElementById('edit-prod-venda').value), qtd: parseFloat(document.getElementById('edit-prod-qtd').value) }); window.mostrarLoading(false); document.getElementById('modal-prod').classList.add('hidden'); window.carregarEstoque(); };
@@ -2132,7 +2145,11 @@ window.salvarEdicaoCliente = async () => {
     document.getElementById('modal-cliente-edit').classList.add('hidden'); 
     window.carregarClientes(); 
 };
-// --- LÓGICA DE FUNCIONÁRIOS ---
+// Novos filtros
+window.filtrarGastos = () => { const t = document.getElementById('busca-gastos').value.toLowerCase(); document.querySelectorAll('#tabela-gastos tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
+// Filtro Avançado de Funcionários (Busca por Texto + Busca por Perfil)
+window.filtrarFuncionarios = () => { const t = document.getElementById('busca-funcionarios').value.toLowerCase(); document.querySelectorAll('#tabela-funcionarios tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
+// Atualizar função carregarFuncionarios para ter a Checkbox
 window.carregarFuncionarios = async () => {
     if(usuarioAtual.role !== 'gerente') return; 
     const snap = await getDocs(collection(db, 'loja_usuarios'));
@@ -2142,11 +2159,10 @@ window.carregarFuncionarios = async () => {
     
     snap.forEach(d => {
         const u = d.data();
-        let statusRole = u.role === 'inativo' 
-            ? '<span class="badge badge-danger">REVOGADO</span>' 
-            : `<span class="badge badge-success">${u.role.toUpperCase()}</span>`;
+        let statusRole = u.role === 'inativo' ? '<span class="badge badge-danger">REVOGADO</span>' : `<span class="badge badge-success">${u.role.toUpperCase()}</span>`;
             
         html += `<tr>
+            <td style="text-align:center"><input type="checkbox" class="func-checkbox" value="${d.id}"></td>
             <td>${u.nome}</td><td>${u.email}</td><td>${statusRole}</td>
             <td>
                 <button onclick="window.abrirEditarFuncionario('${d.id}', '${u.nome}', '${u.role}')" class="btn-icon btn-edit" title="Editar"><i class="fas fa-edit"></i></button>
@@ -2155,6 +2171,25 @@ window.carregarFuncionarios = async () => {
         </tr>`;
     });
     tb.innerHTML = html;
+    configurarCheckboxes('select-all-func', 'func-checkbox', 'bulk-actions-funcionarios', null);
+};
+
+// Nova Função de apagar Funcionários em Massa
+window.excluirMassaFuncionarios = async () => { 
+    const c = document.querySelectorAll('.func-checkbox:checked'); 
+    if(c.length===0) return; 
+    
+    window.mostrarConfirmacao("Apagar Funcionários?", `Você está prestes a excluir permanentemente ${c.length} contas de acesso. Continuar?`, async () => { 
+        window.mostrarLoading(true); 
+        for(const x of c) {
+            await deleteDoc(doc(db, 'loja_usuarios', x.value)); 
+        }
+        window.mostrarLoading(false); 
+        document.getElementById('select-all-func').checked = false; 
+        document.getElementById('bulk-actions-funcionarios').classList.add('hidden'); 
+        window.mostrarAlerta("Sucesso", "Funcionários removidos com sucesso!", "success");
+        window.carregarFuncionarios(); 
+    }); 
 };
 
 document.getElementById('form-funcionario')?.addEventListener('submit', async (e) => {
