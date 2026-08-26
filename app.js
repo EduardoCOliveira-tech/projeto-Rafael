@@ -1078,7 +1078,12 @@ window.atualizarInfoPagamento = () => {
     const inputParcial = document.getElementById('valor-pagamento-parcial');
     
     if (elRestante) {
-        if (restante > 0.01) {
+        // CORREÇÃO: Verifica primeiro se o carrinho está vazio!
+        if (totalCarrinho === 0) {
+            elRestante.innerText = 'Restante: R$ 0,00';
+            elRestante.style.color = '#ef4444'; // Vermelho (Padrão)
+            if(inputParcial) inputParcial.value = '';
+        } else if (restante > 0.01) {
             elRestante.innerText = `Falta: R$ ${restante.toFixed(2)}`;
             elRestante.style.color = '#ef4444'; // Vermelho
             if(inputParcial) inputParcial.value = restante.toFixed(2); // Sugere o valor restante
@@ -1088,7 +1093,7 @@ window.atualizarInfoPagamento = () => {
             if(inputParcial) inputParcial.value = '';
         } else {
             elRestante.innerText = 'Total Coberto ✅';
-            elRestante.style.color = '#10b981';
+            elRestante.style.color = '#10b981'; // Verde
             if(inputParcial) inputParcial.value = '';
         }
     }
@@ -1284,6 +1289,13 @@ window.calcularTrocoVisivo = () => {
     const totalCarrinho = carrinho.reduce((acc, item) => acc + item.total, 0);
     const totalPago = pagamentosVenda.reduce((acc, pg) => acc + pg.valor, 0);
     const restante = totalCarrinho - totalPago;
+
+    // CORREÇÃO: Impede cálculos visuais se não há produtos
+    if (totalCarrinho === 0) {
+         elRestante.innerText = 'Restante: R$ 0,00';
+         elRestante.style.color = '#ef4444';
+         return;
+    }
 
     if (!isNaN(valorDigitado) && valorDigitado > restante) {
         const troco = valorDigitado - restante;
