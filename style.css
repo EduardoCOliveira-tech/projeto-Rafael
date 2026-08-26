@@ -959,3 +959,29 @@ input#busca-funcionarios:focus {
         padding: 10px 15px !important;
     }
 }
+
+/* =========================================================
+   CORREÇÃO EXTREMA: DATAS VAZANDO NO MOBILE (iOS / Android)
+   ========================================================= */
+@media (max-width: 768px) {
+    /* 1. Tira o estilo nativo teimoso do iPhone/Android que força o botão a crescer */
+    input[type="date"], 
+    input[type="month"] {
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important; /* O segredo está aqui: zera a largura mínima nativa! */
+        box-sizing: border-box !important;
+        display: block !important;
+    }
+
+    /* 2. Força a "caixa" que guarda a data a não se expandir */
+    .form-group, 
+    #filtro-periodo-geral,
+    .date-control {
+        min-width: 0 !important;
+        width: 100% !important;
+        overflow: hidden !important; /* Se a data tentar crescer, essa caixa corta a ponta dela */
+    }
+}
