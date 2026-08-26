@@ -858,86 +858,104 @@ input#busca-funcionarios:focus {
 }
 
 /* =========================================================
-   CORREÇÃO DEFINITIVA: BORDAS E DATAS NO MODO MOBILE (iPHONE/ANDROID)
+   RESPONSIVIDADE: MODO APLICATIVO (MOBILE)
    ========================================================= */
 @media (max-width: 768px) {
-    /* 1. Trava a largura MÁXIMA de qualquer caixa de texto, data ou menu na tela */
-    input, select, textarea {
-        width: 100% !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-    }
-
-    /* 2. Remove o comportamento do formulário tentar colocar elementos lado a lado */
-    .form-row {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 15px !important;
-        width: 100% !important;
-    }
-
-    .form-group {
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        flex: none !important;
-    }
-
-    /* 3. Correção Cirúrgica para a Data da Venda (Quebrando a div pai) */
-    /* A div que segura os botões e a data estava usando flexbox inline */
-    .view#vendas .card.form-container > div:last-child {
-        display: flex !important;
-        flex-direction: column !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-    }
-
-    .view#vendas .card.form-container > div:last-child .form-row {
-        display: flex !important;
-        flex-direction: column !important;
-        width: 100% !important;
-    }
-
-    /* 4. Correção para o "Total: R$ 0,00" e botão "Finalizar" encavalados */
-    .view#vendas .card.form-container > div:last-child > div:last-child {
-        display: flex !important;
-        flex-direction: column !important; /* Coloca o Total em cima e o Botão embaixo */
-        align-items: center !important;
-        gap: 15px !important;
-        width: 100% !important;
-        margin-top: 20px !important;
-    }
-
-    /* Faz o botão finalizar ocupar a largura toda para ficar bonito no dedo */
-    .view#vendas .btn-success {
-        width: 100% !important;
-        padding: 15px !important;
-        font-size: 1.2rem !important;
-    }
-
-    /* 5. Correção do Formulário de Gastos (Datas e Selects Vazando) */
-    #form-gasto, #form-gasto > div {
-        width: 100% !important;
-        box-sizing: border-box !important;
-        overflow-x: hidden !important; /* Esconde qualquer pontinha que tente sair */
-    }
-
-    /* 6. Corrige o seletor de Filtro Geral (Data Início e Fim) */
-    #area-filtros-data {
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        width: 100% !important;
-    }
-
-    #filtro-periodo-geral {
-        display: flex !important;
-        flex-direction: column !important;
-        width: 100% !important;
-        gap: 8px !important;
+    /* 1. Layout Base */
+    #app-screen { flex-direction: column; }
+    .content { 
+        padding: 15px; 
+        padding-bottom: 90px; /* Espaço para o menu não tampar o conteúdo no final */
     }
     
-    #filtro-periodo-geral > * {
-        width: 100% !important;
+    /* 2. Menu Transformado em "Bottom Tab Bar" (Menu de App) */
+    .sidebar {
+        position: fixed;
+        bottom: 0; left: 0;
+        width: 100%; height: 80px;
+        flex-direction: row;
+        align-items: center;
+        padding: 0 10px;
+        z-index: 2000;
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+        overflow-x: auto; /* Permite arrastar os menus pro lado */
+        -ms-overflow-style: none; scrollbar-width: none; /* Esconde a barra de rolagem */
+    }
+    .sidebar::-webkit-scrollbar { display: none; }
+    
+    .sidebar-header { display: none; } /* Esconde Logo e botão de abrir menu */
+    
+    /* Organizando os botões do Menu */
+    .menu { 
+        display: flex; flex-direction: row; 
+        margin: 0; overflow: visible; gap: 8px;
+    }
+    .menu li {
+        flex-direction: column; gap: 6px;
+        padding: 10px 5px; min-width: 80px;
+        border-radius: 12px; margin: 0;
+        justify-content: center; align-items: center;
+    }
+    .menu li i { font-size: 1.3rem; width: auto; }
+    .menu li span { display: block; font-size: 0.65rem; text-align: center; }
+    
+    /* Puxando o botão de Backup, Planilha e Sair para a mesma linha do menu */
+    .sidebar-footer {
+        display: flex; flex-direction: row; gap: 8px;
+        padding: 0; border: none; margin-left: 8px;
+    }
+    .sidebar-footer div { display: none; } /* Esconde divisória */
+    
+    .sidebar-footer button {
+        flex-direction: column; gap: 6px;
+        padding: 10px 5px !important; min-width: 80px;
+        height: 100%; margin: 0 !important;
+        border-radius: 12px;
+        justify-content: center; align-items: center;
+    }
+    .sidebar-footer button i { font-size: 1.3rem; margin: 0; }
+    .sidebar-footer button span { display: block; font-size: 0.65rem; text-align: center; }
+    
+    /* Truque: Trocar o nome gigante do botão do Excel por um texto menor */
+    .sidebar-footer .btn-success { font-size: 0 !important; }
+    .sidebar-footer .btn-success::after { 
+        content: 'Baixar Excel'; font-size: 0.65rem; 
+        display: block; font-family: 'Poppins', sans-serif; margin-top: 6px;
+    }
+    
+    /* 3. Ajuste do Cabeçalho e Filtros (Top Bar) */
+    .top-bar { flex-direction: column; align-items: stretch; gap: 15px; }
+    .top-bar > div { width: 100%; justify-content: space-between; }
+    .date-control { flex-direction: column; align-items: stretch !important; }
+    #filtro-periodo-geral { flex-direction: column; gap: 10px; }
+    #filtro-periodo-geral input { width: 100%; }
+    
+    /* 4. Formulários ocupando 100% da tela (Fácil de digitar) */
+    .form-row { flex-direction: column; gap: 15px; }
+    .form-group { width: 100% !important; flex: none !important; }
+    
+    /* 5. Tabelas: Indicação Visual de Rolagem */
+    .table-responsive { position: relative; border-radius: 12px; }
+    .table-responsive::before {
+        content: 'Arraste a tabela para o lado 👉';
+        display: block; text-align: center;
+        font-size: 0.75rem; font-weight: 600;
+        color: var(--primary); padding: 8px;
+        background: rgba(79, 70, 229, 0.05);
+    }
+    
+    /* 6. Cards / Dashboard */
+    .kpi-grid { grid-template-columns: 1fr; gap: 15px; }
+    .chart-container { height: 320px; }
+    
+    /* 7. Ajuste Modais (Telas flutuantes) */
+    .modal-box { padding: 25px 20px; width: 95%; max-height: 85vh; }
+    .login-box { padding: 40px 25px; }
+
+    /* 8. Ajuste das Barras Flutuantes (Para não ficar embaixo do novo menu) */
+    #bulk-actions, #bulk-actions-gastos, #bulk-actions-clientes, #bulk-actions-estoque, #bulk-actions-devedores {
+        bottom: 95px !important; /* Flutua logo acima do menu inferior */
+        width: 90% !important;
+        padding: 10px 15px !important;
     }
 }

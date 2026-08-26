@@ -2177,7 +2177,26 @@ window.salvarEdicaoCliente = async () => {
 // Novos filtros
 window.filtrarGastos = () => { const t = document.getElementById('busca-gastos').value.toLowerCase(); document.querySelectorAll('#tabela-gastos tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
 // Filtro Avançado de Funcionários (Busca por Texto + Busca por Perfil)
-window.filtrarFuncionarios = () => { const t = document.getElementById('busca-funcionarios').value.toLowerCase(); document.querySelectorAll('#tabela-funcionarios tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
+window.filtrarFuncionarios = () => { 
+    const texto = document.getElementById('busca-funcionarios').value.toLowerCase(); 
+    const perfil = document.getElementById('filtro-perfil-func').value.toUpperCase();
+
+    document.querySelectorAll('#tabela-funcionarios tbody tr').forEach(row => { 
+        // Pega o texto da linha inteira
+        const contemTexto = row.innerText.toLowerCase().includes(texto); 
+        
+        // Pega o texto especificamente da coluna de Perfil (a coluna 3, já que começa em 0)
+        const colunaPerfil = row.cells[3] ? row.cells[3].innerText.toUpperCase() : '';
+        const contemPerfil = perfil === "" || colunaPerfil.includes(perfil);
+
+        // Só exibe a linha se ela passar nos dois testes (texto + opção do menu)
+        if (contemTexto && contemPerfil) {
+            row.style.display = ''; 
+        } else {
+            row.style.display = 'none'; 
+        }
+    }); 
+};
 // Atualizar função carregarFuncionarios para ter a Checkbox
 window.carregarFuncionarios = async () => {
     if(usuarioAtual.role !== 'gerente') return; 
