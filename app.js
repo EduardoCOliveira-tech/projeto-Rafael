@@ -688,27 +688,67 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 1. EVENTO DE AUTOPREENCHIMENTO (Ao digitar o nome do produto)
-    document.getElementById('prod-nome')?.addEventListener('input', function() {
-        const nomeDigitado = this.value.trim().toLowerCase();
+    // ============================================================
+// CÁLCULOS AUTOMÁTICOS DE ESTOQUE (MARGEM E PREÇO)
+// ============================================================
+window.calcularPrecoVenda = () => {
+    const custo = parseFloat(document.getElementById('prod-custo').value) || 0;
+    const margem = parseFloat(document.getElementById('prod-margem').value) || 0;
+    if (custo > 0) {
+        const venda = custo + (custo * (margem / 100));
+        document.getElementById('prod-venda').value = venda.toFixed(2);
+    }
+};
+
+window.calcularMargem = () => {
+    const custo = parseFloat(document.getElementById('prod-custo').value) || 0;
+    const venda = parseFloat(document.getElementById('prod-venda').value) || 0;
+    if (custo > 0 && venda > 0) {
+        const margem = ((venda - custo) / custo) * 100;
+        document.getElementById('prod-margem').value = margem.toFixed(0);
+    }
+};
+
+window.atualizarMargemCategoria = () => {
+    const catNome = document.getElementById('prod-categoria').value;
+    const categoria = categoriasCache.find(c => c.nome === catNome);
+    if (categoria && categoria.margem) {
+        document.getElementById('prod-margem').value = categoria.margem;
+        window.calcularPrecoVenda(); // Atualiza o preço de venda puxando a margem da categoria
+    }
+};
+
+// 1. EVENTO DE AUTOPREENCHIMENTO (Ao digitar o nome do produto)
+document.getElementById('prod-nome')?.addEventListener('input', function() {
+    const nomeDigitado = this.value.trim().toLowerCase();
+     
+    // NOVIDADE: Se o campo nome ficar vazio, o sistema "reseta" os outros campos para você cadastrar do zero
+    if (nomeDigitado === '') {
+        document.getElementById('prod-categoria').value = '';
+        document.getElementById('prod-custo').value = '';
+        document.getElementById('prod-venda').value = '';
+        document.getElementById('prod-margem').value = '0';
+        document.getElementById('prod-qtd').value = '';
+        return; // Para a execução aqui
+    }
+
+    // Busca no cache local (insensível a maiúsculas/minúsculas)
+    const produtoEncontrado = produtosCache.find(p => p.nome.toLowerCase() === nomeDigitado);
         
-        // Procura no cache (ignora maiúsculas/minúsculas)
-        const produtoEncontrado = produtosCache.find(p => p.nome.toLowerCase() === nomeDigitado);
+    if (produtoEncontrado) {
+        // Preenche os campos automaticamente com o que está no banco
+        document.getElementById('prod-categoria').value = produtoEncontrado.categoria || '';
+        document.getElementById('prod-custo').value = produtoEncontrado.custo;
+        document.getElementById('prod-venda').value = produtoEncontrado.venda;
         
-        if (produtoEncontrado) {
-            // Preenche os campos se achou o produto
-            document.getElementById('prod-categoria').value = produtoEncontrado.categoria || '';
-            document.getElementById('prod-custo').value = produtoEncontrado.custo;
-            document.getElementById('prod-venda').value = produtoEncontrado.venda;
-            
-            // Calcula e mostra a margem (visual)
-            if(produtoEncontrado.custo > 0) {
-                const margem = ((produtoEncontrado.venda - produtoEncontrado.custo) / produtoEncontrado.custo) * 100;
-                const campoMargem = document.getElementById('prod-margem');
-                if(campoMargem) campoMargem.value = margem.toFixed(0);
-            }
+        // Calcula a margem visualmente
+        if(produtoEncontrado.custo > 0) {
+            const margem = ((produtoEncontrado.venda - produtoEncontrado.custo) / produtoEncontrado.custo) * 100;
+            const campoMargem = document.getElementById('prod-margem');
+            if(campoMargem) campoMargem.value = margem.toFixed(0);
         }
-    });
+    }
+});
 
     // 2. EVENTO DE SALVAR (SOMA AO ESTOQUE OU CRIA NOVO)
     document.getElementById('form-produto')?.addEventListener('submit', async (e) => {
