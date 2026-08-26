@@ -289,7 +289,7 @@ function renderizarTabelaGastos() {
         const dia = new Date(g.dataEntrada.seconds * 1000).getDate();
         evolucaoDia[dia] = (evolucaoDia[dia] || 0) + g.valor;
 
-        htmlBuffer += `<tr><td style="text-align:center"><input type="checkbox" class="gasto-checkbox" value="${g.id}"></td><td>${dataF}</td><td>${g.nome}</td><td>${g.banco||'-'}</td><td>${g.metodo||'-'}</td><td>${vencF}</td><td>R$ ${g.valor.toFixed(2)}</td><td><span class="badge ${badge}">${g.status.toUpperCase()}</span></td><td><button onclick="window.abrirEditarGasto('${g.id}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button><button onclick="window.excluirGasto('${g.id}')" class="btn-icon btn-delete"><i class="fas fa-trash"></i></button></td></tr>`;
+        htmlBuffer += `<tr><td style="text-align:center"><input type="checkbox" class="gasto-checkbox" value="${g.id}"></td><td>${dataF}</td><td>${g.nome}</td><td><span class="badge" style="background:#e0e7ff; color:#3730a3">${g.tipo || '-'}</span></td><td>${g.banco||'-'}</td><td>${g.metodo||'-'}</td><td>${vencF}</td><td>R$ ${g.valor.toFixed(2)}</td><td><span class="badge ${badge}">${g.status.toUpperCase()}</span></td><td><button onclick="window.abrirEditarGasto('${g.id}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button><button onclick="window.excluirGasto('${g.id}')" class="btn-icon btn-delete"><i class="fas fa-trash"></i></button></td></tr>`;
     });
     
     tbody.innerHTML = htmlBuffer;
@@ -803,6 +803,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const nomeBase = document.getElementById('gasto-nome').value;
         const valor = parseFloat(document.getElementById('gasto-valor').value);
         const repeticoes = parseInt(document.getElementById('gasto-repetir').value) || 0; // Pega o número de repetições
+        const tipoGasto = document.getElementById('gasto-tipo').value; // <-- ADICIONAR ESSA LINHA LÁ NO TOPO DA FUNÇÃO
         
         const dtEntradaBase = new Date(document.getElementById('gasto-data-entrada').value + 'T12:00:00');
         const dtVencInput = document.getElementById('gasto-data-vencimento').value;
@@ -851,6 +852,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 batch.set(docRef, { 
                     nome: nomeBase, 
+                    tipo: tipoGasto,
                     valor: valor, 
                     status: statusAtual, 
                     metodo: metodoAtual, 
@@ -998,7 +1000,8 @@ function iniciarApp() {
         carregarClientes(),
         window.carregarDashboard(),
         window.carregarGastos(),
-        window.carregarBancos()
+        window.carregarBancos(),
+        window.carregarTiposGasto()
     ]).catch(console.error);
 }
 
@@ -1588,6 +1591,27 @@ window.salvarEdicaoVenda=async()=>{const id=document.getElementById('edit-id').v
 window.abrirModalBancos = () => document.getElementById('modal-bancos').classList.remove('hidden');
 window.adicionarBanco = async () => { const n = document.getElementById('novo-banco-nome').value.trim(); if(n) { await addDoc(collection(db, COLECAO_BANCOS), { nome: n }); document.getElementById('novo-banco-nome').value = ''; window.carregarBancos(); } };
 window.removerBanco = async (id) => { window.mostrarConfirmacao("Excluir Banco?", "Essa ação não pode ser desfeita.", async () => { await deleteDoc(doc(db, COLECAO_BANCOS, id)); window.carregarBancos(); }); };
+// --- LÓGICA DE TIPOS/CATEGORIAS DE GASTOS ---
+window.carregarTiposGasto = async () => {
+    const selects = [document.getElementById('gasto-tipo'), document.getElementById('edit-gasto-tipo')];
+    const ul = document.getElementById('lista-tipos-gasto');
+    if(ul) ul.innerHTML = '';
+    selects.forEach(s => { if(s) s.innerHTML = '<option value="">Selecione...</option>'; });
+    
+    try {
+        const snap = await getDocs(query(collection(db, 'loja_tipos_gasto'), orderBy("nome")));
+        snap.forEach(d => { 
+            const t = d.data(); 
+            selects.forEach(s => { 
+                if(s) { const opt = document.createElement('option'); opt.value = t.nome; opt.text = t.nome; s.appendChild(opt); } 
+            }); 
+            if(ul) ul.innerHTML += `<li style="display:flex; justify-content:space-between; padding:8px 5px; border-bottom:1px solid var(--border-color); font-size:0.9rem;">${t.nome} <button onclick="window.removerTipoGasto('${d.id}')" class="btn-icon" style="color:var(--danger); font-size:0.9rem; padding:0"><i class="fas fa-trash"></i></button></li>`; 
+        });
+    } catch(e) { console.error("Erro tipos gasto", e); }
+};
+window.abrirModalTiposGasto = () => document.getElementById('modal-tipos-gasto').classList.remove('hidden');
+window.adicionarTipoGasto = async () => { const n = document.getElementById('novo-tipo-gasto-nome').value.trim().toUpperCase(); if(n) { await addDoc(collection(db, 'loja_tipos_gasto'), { nome: n }); document.getElementById('novo-tipo-gasto-nome').value = ''; window.carregarTiposGasto(); window.mostrarAlerta("Sucesso", "Tipo de gasto adicionado!", "success"); } };
+window.removerTipoGasto = async (id) => { window.mostrarConfirmacao("Excluir Tipo?", "Essa ação não pode ser desfeita.", async () => { await deleteDoc(doc(db, 'loja_tipos_gasto', id)); window.carregarTiposGasto(); }); };
 window.toggleCamposPagamento = (idSelect, idContainer) => {
     const status = document.getElementById(idSelect).value;
     const container = document.getElementById(idContainer);
@@ -1601,13 +1625,14 @@ window.abrirEditarGasto = async (id) => {
         const g = docSnap.data();
         document.getElementById('edit-gasto-id').value = id;
         document.getElementById('edit-gasto-nome').value = g.nome;
+        document.getElementById('edit-gasto-tipo').value = g.tipo || ''; // <-- Puxa o Tipo do Banco
         document.getElementById('edit-gasto-valor').value = g.valor;
         
         // Tratamento de datas
         if (g.dataEntrada && g.dataEntrada.toDate) {
              document.getElementById('edit-gasto-data').value = g.dataEntrada.toDate().toISOString().split('T')[0];
         }
-        document.getElementById('edit-gasto-venc').value = g.vencimento;
+        document.getElementById('edit-gasto-venc').value = g.vencimento || '';
         
         document.getElementById('edit-gasto-status').value = g.status;
         
@@ -1624,9 +1649,11 @@ window.abrirEditarGasto = async (id) => {
         document.getElementById('modal-gasto-edit').classList.remove('hidden');
     }
 };
+
 window.salvarEdicaoGasto = async () => {
     const id = document.getElementById('edit-gasto-id').value;
     const nomeBase = document.getElementById('edit-gasto-nome').value;
+    const tipoBase = document.getElementById('edit-gasto-tipo').value; // <-- Captura o Tipo Editado
     const valor = parseFloat(document.getElementById('edit-gasto-valor').value);
     const repeticoes = parseInt(document.getElementById('edit-gasto-repetir').value) || 0;
     
@@ -1654,6 +1681,7 @@ window.salvarEdicaoGasto = async () => {
         const docRefOriginal = doc(db, COLECAO_GASTOS, id);
         batch.update(docRefOriginal, { 
             nome: nomeBase, 
+            tipo: tipoBase, // <-- Salva o Tipo
             valor: valor, 
             status: statusInicial, 
             metodo: metodoInicial, 
@@ -1684,6 +1712,7 @@ window.salvarEdicaoGasto = async () => {
             // Repetições nascem sempre como PENDENTE, independente do original ser pago
             batch.set(novoDocRef, {
                 nome: nomeBase,
+                tipo: tipoBase, // <-- Replica o Tipo para os meses seguintes
                 valor: valor,
                 status: 'pendente',
                 metodo: null,
@@ -2293,5 +2322,76 @@ window.excluirFuncionario = (id, email) => {
         } finally {
             window.mostrarLoading(false);
         }
+    });
+};
+
+// ============================================================
+// RELATÓRIO DE TOP GASTOS
+// ============================================================
+let chartRelatorioGastos = null;
+
+window.abrirRelatorioGastos = () => { 
+    document.getElementById('modal-relatorio-gastos').classList.remove('hidden'); 
+    window.gerarGraficoRelatorioGastos(); 
+};
+
+window.gerarGraficoRelatorioGastos = () => {
+    const limite = parseInt(document.getElementById('relatorio-gastos-filtro').value);
+    const agrupamento = document.getElementById('relatorio-gastos-agrupamento').value; // 'tipo' ou 'nome'
+    
+    const agregacao = {};
+    
+    // Varre o cache de gastos que já está na memória (Super Rápido)
+    gastosCache.forEach(g => {
+        let chave = agrupamento === 'tipo' ? (g.tipo || 'Sem Tipo') : g.nome;
+        agregacao[chave] = (agregacao[chave] || 0) + g.valor; // Soma o valor financeiro (R$)
+    });
+    
+    // Converte para um Array e organiza do mais caro para o mais barato
+    const arrayGastos = Object.keys(agregacao).map(chave => { 
+        return { chave: chave, valor: agregacao[chave] }; 
+    });
+    
+    arrayGastos.sort((a, b) => b.valor - a.valor); 
+    const topGastos = arrayGastos.slice(0, limite);
+    
+    const labels = topGastos.map(i => i.chave); 
+    const data = topGastos.map(i => i.valor);
+    
+    // Cria cores aleatórias, porém um pouco mais avermelhadas/quentes (combinando com gastos)
+    const bgColors = labels.map(() => `hsl(${Math.random() * 40 + 340}, 75%, 60%)`);
+    
+    const ctx = document.getElementById('chartRelatorioGastos'); 
+    if(chartRelatorioGastos) chartRelatorioGastos.destroy();
+    
+    chartRelatorioGastos = new Chart(ctx.getContext('2d'), { 
+        type: 'pie', 
+        data: { 
+            labels: labels, 
+            datasets: [{ 
+                data: data, 
+                backgroundColor: bgColors 
+            }] 
+        }, 
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { 
+                legend: { position: 'right', labels: { boxWidth: 10 } },
+                // Configura para mostrar o valor formatado em Reais (R$) ao passar o mouse
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) label += ': ';
+                            if (context.parsed !== null) {
+                                label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            } 
+        } 
     });
 };

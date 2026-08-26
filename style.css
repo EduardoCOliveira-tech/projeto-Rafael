@@ -514,109 +514,6 @@ tfoot td { padding: 15px; font-size: 1rem; color: var(--text-main); font-weight:
     }
 }
 
-/* =========================================================
-   RESPONSIVIDADE: MODO APLICATIVO (MOBILE)
-   ========================================================= */
-@media (max-width: 768px) {
-    /* 1. Layout Base */
-    #app-screen { flex-direction: column; }
-    .content { 
-        padding: 15px; 
-        padding-bottom: 90px; /* Espaço para o menu não tampar o conteúdo no final */
-    }
-    
-    /* 2. Menu Transformado em "Bottom Tab Bar" (Menu de App) */
-    .sidebar {
-        position: fixed;
-        bottom: 0; left: 0;
-        width: 100%; height: 80px;
-        flex-direction: row;
-        align-items: center;
-        padding: 0 10px;
-        z-index: 2000;
-        box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
-        overflow-x: auto; /* Permite arrastar os menus pro lado */
-        -ms-overflow-style: none; scrollbar-width: none; /* Esconde a barra de rolagem */
-    }
-    .sidebar::-webkit-scrollbar { display: none; }
-    
-    .sidebar-header { display: none; } /* Esconde Logo e botão de abrir menu */
-    
-    /* Organizando os botões do Menu */
-    .menu { 
-        display: flex; flex-direction: row; 
-        margin: 0; overflow: visible; gap: 8px;
-    }
-    .menu li {
-        flex-direction: column; gap: 6px;
-        padding: 10px 5px; min-width: 80px;
-        border-radius: 12px; margin: 0;
-        justify-content: center; align-items: center;
-    }
-    .menu li i { font-size: 1.3rem; width: auto; }
-    .menu li span { display: block; font-size: 0.65rem; text-align: center; }
-    
-    /* Puxando o botão de Backup, Planilha e Sair para a mesma linha do menu */
-    .sidebar-footer {
-        display: flex; flex-direction: row; gap: 8px;
-        padding: 0; border: none; margin-left: 8px;
-    }
-    .sidebar-footer div { display: none; } /* Esconde divisória */
-    
-    .sidebar-footer button {
-        flex-direction: column; gap: 6px;
-        padding: 10px 5px !important; min-width: 80px;
-        height: 100%; margin: 0 !important;
-        border-radius: 12px;
-        justify-content: center; align-items: center;
-    }
-    .sidebar-footer button i { font-size: 1.3rem; margin: 0; }
-    .sidebar-footer button span { display: block; font-size: 0.65rem; text-align: center; }
-    
-    /* Truque: Trocar o nome gigante do botão do Excel por um texto menor */
-    .sidebar-footer .btn-success { font-size: 0 !important; }
-    .sidebar-footer .btn-success::after { 
-        content: 'Baixar Excel'; font-size: 0.65rem; 
-        display: block; font-family: 'Poppins', sans-serif; margin-top: 6px;
-    }
-    
-    /* 3. Ajuste do Cabeçalho e Filtros (Top Bar) */
-    .top-bar { flex-direction: column; align-items: stretch; gap: 15px; }
-    .top-bar > div { width: 100%; justify-content: space-between; }
-    .date-control { flex-direction: column; align-items: stretch !important; }
-    #filtro-periodo-geral { flex-direction: column; gap: 10px; }
-    #filtro-periodo-geral input { width: 100%; }
-    
-    /* 4. Formulários ocupando 100% da tela (Fácil de digitar) */
-    .form-row { flex-direction: column; gap: 15px; }
-    .form-group { width: 100% !important; flex: none !important; }
-    
-    /* 5. Tabelas: Indicação Visual de Rolagem */
-    .table-responsive { position: relative; border-radius: 12px; }
-    .table-responsive::before {
-        content: 'Arraste a tabela para o lado 👉';
-        display: block; text-align: center;
-        font-size: 0.75rem; font-weight: 600;
-        color: var(--primary); padding: 8px;
-        background: rgba(79, 70, 229, 0.05);
-    }
-    
-    /* 6. Cards / Dashboard */
-    .kpi-grid { grid-template-columns: 1fr; gap: 15px; }
-    .chart-container { height: 320px; }
-    
-    /* 7. Ajuste Modais (Telas flutuantes) */
-    .modal-box { padding: 25px 20px; width: 95%; max-height: 85vh; }
-    .login-box { padding: 40px 25px; }
-
-    /* 8. Ajuste das Barras Flutuantes (Para não ficar embaixo do novo menu) */
-    #bulk-actions, #bulk-actions-gastos, #bulk-actions-clientes, #bulk-actions-estoque, #bulk-actions-devedores {
-        bottom: 95px !important; /* Flutua logo acima do menu inferior */
-        width: 90% !important;
-        padding: 10px 15px !important;
-    }
-}
-
 /* Correção do alinhamento dos Filtros de Data */
 #filtro-periodo-geral {
     display: flex;
@@ -643,4 +540,319 @@ input[list] {
 }
 input[list]:focus {
     background-color: var(--bg-card);
+}
+
+/* =========================================================
+   RESPONSIVIDADE: MODO APLICATIVO (MOBILE) - ATUALIZADO
+   ========================================================= */
+@media (max-width: 768px) {
+    /* 1. Layout Base */
+    #app-screen { flex-direction: column; }
+    .content { 
+        padding: 15px; 
+        padding-bottom: 90px; 
+    }
+    
+    /* 2. Menu Transformado em "Bottom Tab Bar" (Menu de App) */
+    .sidebar {
+        position: fixed; bottom: 0; left: 0;
+        width: 100%; height: 75px;
+        flex-direction: row; align-items: center;
+        padding: 0 5px; z-index: 2000;
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+        overflow-x: auto; -ms-overflow-style: none; scrollbar-width: none;
+    }
+    .sidebar::-webkit-scrollbar { display: none; }
+    .sidebar-header { display: none; }
+    
+    /* Organizando os botões do Menu */
+    .menu { display: flex; flex-direction: row; margin: 0; overflow: visible; gap: 5px; }
+    .menu li {
+        flex-direction: column; gap: 4px;
+        padding: 8px 5px; min-width: 75px;
+        border-radius: 12px; margin: 0;
+        justify-content: center; align-items: center;
+    }
+    .menu li i { font-size: 1.3rem; width: auto; margin-bottom: 2px; }
+    .menu li span { display: block; font-size: 0.65rem; text-align: center; }
+    
+    /* 3. Botões do Rodapé (Backup, Excel, Sair) Uniformizados com o Menu */
+    .sidebar-footer {
+        display: flex; flex-direction: row; gap: 5px;
+        padding: 0; border: none; margin-left: 5px; align-items: center;
+    }
+    .sidebar-footer div { display: none; } /* Esconde a linha divisória */
+    
+    .sidebar-footer button {
+        flex-direction: column !important; gap: 4px !important;
+        padding: 8px 5px !important; min-width: 75px !important;
+        width: auto !important; height: auto !important; margin: 0 !important;
+        border-radius: 12px !important;
+        justify-content: center !important; align-items: center !important;
+        background: transparent !important; /* Remove cores de fundo para igualar ao menu */
+        color: #94A3B8 !important; /* Cor padrão do menu */
+        box-shadow: none !important;
+    }
+    .sidebar-footer button i { font-size: 1.3rem !important; margin: 0 0 2px 0 !important; }
+    .sidebar-footer button span { display: block !important; font-size: 0.65rem !important; text-align: center; }
+    
+    /* Cores originais apenas para os ícones */
+    .sidebar-footer button[onclick*="modal-backup"] i { color: #e67e22 !important; }
+    #btn-logout i { color: #ef4444 !important; }
+    #btn-logout span { color: #ef4444 !important; }
+
+    /* Formatando o Botão do Excel */
+    .sidebar-footer .btn-success { font-size: 0 !important; }
+    .sidebar-footer .btn-success i { color: #10b981 !important; }
+    .sidebar-footer .btn-success::after { 
+        content: 'Excel'; font-size: 0.65rem; 
+        display: block; font-family: 'Poppins', sans-serif; color: #94A3B8;
+    }
+    
+    /* 4. Formulários 100% empilhados (Nova Venda, Gastos, etc) */
+    .form-row { 
+        display: flex !important; 
+        flex-direction: column !important; 
+        gap: 15px !important; 
+        width: 100% !important; 
+    }
+    .form-group { 
+        width: 100% !important; 
+        min-width: 100% !important; 
+        margin: 0 !important; 
+    }
+    
+    /* Garante que TODAS as datas e inputs respeitem a tela (Evita encavalar) */
+    .form-group input, .form-group select { 
+        width: 100% !important; 
+        max-width: 100% !important; 
+        box-sizing: border-box !important; 
+    }
+    
+    /* Ajuste específico para a área de Pagamento da Nova Venda */
+    .form-group > div[style*="display: flex"] { 
+        flex-wrap: wrap !important; 
+        gap: 10px !important; 
+    }
+    #valor-pagamento-parcial { flex: 1 !important; min-width: 80px !important; }
+
+    /* Botão "+ Adicionar" da Venda ocupando a tela toda no celular */
+    .form-group[style*="align-self: flex-end"] { align-self: stretch !important; }
+
+    /* 5. Ajuste do Cabeçalho e Filtros (Top Bar) */
+    .top-bar { flex-direction: column; align-items: stretch; gap: 15px; }
+    .top-bar > div { width: 100%; justify-content: space-between; }
+    .date-control { flex-direction: column; align-items: stretch !important; }
+    #filtro-periodo-geral { flex-direction: column; gap: 10px; }
+    #filtro-periodo-geral input { width: 100%; }
+    
+    /* 6. Melhoria Visual das Listas/Tabelas (Estilo Cards) */
+    .table-responsive { 
+        background: transparent !important; 
+        border: none !important; 
+        box-shadow: none !important; 
+        padding: 0 !important;
+    }
+    .table-responsive::before {
+        content: 'Arraste para o lado para ver mais ações 👉';
+        display: block; text-align: left;
+        font-size: 0.75rem; font-weight: 600;
+        color: var(--text-muted); padding: 5px 0 10px 0;
+    }
+    table { 
+        border-collapse: separate !important; 
+        border-spacing: 0 10px !important; /* Espaço entre as linhas */
+        min-width: 650px; 
+    }
+    thead th { 
+        background: transparent !important; 
+        border-bottom: none !important; 
+        padding: 5px 15px !important; 
+    }
+    tbody tr { 
+        background: var(--bg-card) !important; 
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important; 
+    }
+    tbody td { 
+        border-bottom: none !important; 
+        padding: 15px !important; 
+    }
+    tbody td:first-child { border-radius: 12px 0 0 12px !important; }
+    tbody td:last-child { border-radius: 0 12px 12px 0 !important; }
+    
+    /* 7. Cards / Dashboard */
+    .kpi-grid { grid-template-columns: 1fr; gap: 15px; }
+    .chart-container { height: 320px; }
+    
+    /* 8. Ajuste Modais (Telas flutuantes) */
+    .modal-box { padding: 25px 20px; width: 95%; max-height: 85vh; }
+    .login-box { padding: 40px 25px; }
+
+    /* 9. Ajuste das Barras Flutuantes */
+    #bulk-actions, #bulk-actions-gastos, #bulk-actions-clientes, #bulk-actions-estoque, #bulk-actions-devedores, #bulk-actions-funcionarios {
+        bottom: 95px !important; /* Flutua acima do novo menu inferior */
+        width: 90% !important;
+        padding: 10px 15px !important;
+    }
+}
+
+/* =========================================================
+   CORREÇÕES FINAIS: TEMA ESCURO (GASTOS) E BUSCA (CLIENTES)
+   ========================================================= */
+
+/* 1. Corrige o fundo verde hardcoded no formulário de Gastos para respeitar o Tema Escuro */
+#container-pagamento-novo, 
+#container-pagamento-edit {
+    background: var(--bg-app) !important;
+    border: 2px dashed var(--border-color) !important;
+    padding: 15px !important;
+    border-radius: var(--radius-md) !important;
+    margin-top: 10px !important;
+    margin-bottom: 15px !important;
+}
+
+/* 2. Desencavala as barras de pesquisa isoladas (Dá um espaço confortável) */
+input#busca-clientes, 
+input#busca-devedores,
+input#busca-historico,
+input#busca-gastos,
+input#busca-funcionarios {
+    margin-top: 20px !important;
+    margin-bottom: 20px !important;
+    padding: 14px !important;
+    background-color: var(--bg-app) !important;
+    color: var(--text-main) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-sm) !important;
+    transition: var(--transition) !important;
+}
+
+/* Efeito ao clicar nas barras de pesquisa */
+input#busca-clientes:focus, 
+input#busca-devedores:focus,
+input#busca-historico:focus,
+input#busca-gastos:focus,
+input#busca-funcionarios:focus {
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15) !important;
+    background-color: var(--bg-card) !important;
+}
+
+/* =========================================================
+   RESPONSIVIDADE: NOTEBOOKS (13" e 14" Polegadas) e TABLETS
+   Resoluções entre 769px e 1366px
+   ========================================================= */
+/* =========================================================
+   RESPONSIVIDADE: NOTEBOOKS (13" e 14" Polegadas) - ATUALIZADO
+   ========================================================= */
+@media (min-width: 769px) and (max-width: 1366px) {
+    
+    /* 1. Itens da Barra Lateral (Menu) perfeitamente alinhados */
+    .sidebar { width: 210px !important; padding: 10px 8px !important; }
+    .menu { margin-top: 0 !important; }
+    .menu li { 
+        font-size: 0.8rem !important; 
+        padding: 8px 10px !important; 
+        margin-bottom: 2px !important; 
+        gap: 8px !important;
+        white-space: nowrap !important; /* Impede que nomes de menu quebrem em duas linhas */
+    }
+    .menu li i { font-size: 1rem !important; width: 18px !important; }
+    .brand small { font-size: 0.7rem !important; }
+    
+    /* Botões do rodapé da barra lateral compactados */
+    .sidebar-footer { padding-top: 10px !important; }
+    .sidebar-footer button { 
+        padding: 8px !important; 
+        font-size: 0.75rem !important; 
+        margin-bottom: 8px !important; 
+        white-space: nowrap !important;
+    }
+
+    /* 2. Modais Inteligentes (Não vazam a altura da tela) */
+    .modal-box { 
+        padding: 15px 20px !important; 
+        max-height: 85vh !important; /* O modal NUNCA será maior que 85% da altura da tela */
+        overflow-y: auto !important; /* Cria uma barra de rolagem interna se faltar espaço */
+    }
+    .modal-box h3 { font-size: 1.1rem !important; margin-bottom: 10px !important; }
+    .custom-icon { font-size: 2.5rem !important; margin-bottom: 10px !important; }
+    
+    /* Compactando os formulários de dentro dos Modais */
+    .form-row { gap: 10px !important; margin-bottom: 10px !important; }
+    .form-group { margin-bottom: 5px !important; }
+    .form-group label { margin-bottom: 4px !important; font-size: 0.8rem !important; }
+    input, select { padding: 8px 12px !important; font-size: 0.85rem !important; }
+    
+    /* Ajuste dos botões de Salvar/Cancelar dos Modais */
+    .modal-actions { margin-top: 15px !important; gap: 10px !important; }
+    .modal-actions button { padding: 8px !important; font-size: 0.9rem !important; }
+
+    /* 3. Redução da borda e espaçamento geral da área de conteúdo */
+    .content { padding: 15px 20px !important; }
+    .top-bar { padding: 10px 15px !important; margin-bottom: 15px !important; }
+
+    /* 4. Cards do Dashboard e Gráficos mais compactos */
+    .kpi-grid { gap: 10px !important; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important; margin-bottom: 15px !important;}
+    .kpi { padding: 15px !important; }
+    .kpi h3 { font-size: 0.75rem !important; }
+    .kpi span { font-size: 1.3rem !important; }
+    .chart-container { height: 280px !important; padding: 15px !important; }
+
+    /* 5. Tabelas: Redução de fonte e respiro para evitar barra de rolagem horizontal */
+    table { min-width: 100% !important; }
+    th { padding: 8px 10px !important; font-size: 0.7rem !important; }
+    td { padding: 8px 10px !important; font-size: 0.8rem !important; }
+    td button { padding: 5px !important; font-size: 0.85rem !important; margin-right: 4px !important; }
+}
+
+/* =========================================================
+   CORREÇÕES FINAIS: MENU RECOLHIDO E MODAL DE EXTRATO
+   ========================================================= */
+
+/* 1. Corrige o botão do Excel "encavalado" (Permite que o texto quebre em duas linhas bonitas) */
+.sidebar-footer button {
+    white-space: normal !important; 
+    line-height: 1.3 !important;
+    overflow: hidden !important;
+}
+
+/* 2. Força a Barra Lateral a recolher corretamente */
+.sidebar.collapsed {
+    width: 80px !important;
+    min-width: 80px !important;
+}
+
+/* 3. A MÁGICA: Esconde todos os textos (até os soltos) quando o menu está fechado */
+.sidebar.collapsed .sidebar-footer button {
+    font-size: 0 !important; /* Esconde todo texto bruto (ex: do botão Excel) */
+    padding: 15px 0 !important;
+    min-height: 50px !important;
+    justify-content: center !important;
+}
+
+.sidebar.collapsed .sidebar-footer button i {
+    font-size: 1.3rem !important; /* Garante que apenas o ícone continue grande */
+    margin: 0 !important;
+}
+
+.sidebar.collapsed .sidebar-footer button span {
+    display: none !important; /* Esconde os textos em span (Backup e Sair) */
+}
+
+/* 4. Correção do Modal Extrato com muitos itens (Rolagem Interna) */
+#modal-devedor .modal-box {
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: 85vh !important; 
+    overflow: hidden !important; /* Trava o crescimento do modal na tela */
+}
+
+#modal-devedor .table-responsive {
+    flex-shrink: 1 !important; 
+    overflow-y: auto !important; /* Ativa a rolagem vertical APENAS dentro da tabela */
+    max-height: 100% !important;
+    margin-top: 15px !important;
+    margin-bottom: 15px !important;
+    border: 1px solid var(--border-color) !important;
 }

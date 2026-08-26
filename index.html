@@ -224,10 +224,17 @@
             </section>
 
             <section id="gastos" class="view">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                     <h2>Controle de Gastos</h2>
-                    <div id="bulk-actions-gastos" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;"><button onclick="window.excluirMassaGastos()" class="btn-icon" style="color: #dc2626;">Apagar Selecionados</button></div>
-                    <button onclick="window.abrirModalBancos()" class="btn-primary" style="font-size:0.8rem"><i class="fas fa-university"></i> Gerenciar Bancos</button>
+                    <div id="bulk-actions-gastos" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;">
+                        <button onclick="window.excluirMassaGastos()" class="btn-icon" style="color: #dc2626;">Apagar Selecionados</button>
+                    </div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <!-- NOVO BOTÃO TOP GASTOS AQUI: -->
+                        <button onclick="window.abrirRelatorioGastos()" class="btn-primary" style="font-size:0.8rem; background: #f59e0b;"><i class="fas fa-chart-pie"></i> Top Gastos</button>
+                        <button onclick="window.abrirModalTiposGasto()" class="btn-primary" style="font-size:0.8rem; background: #8b5cf6;"><i class="fas fa-tags"></i> Gerenciar Tipos</button>
+                        <button onclick="window.abrirModalBancos()" class="btn-primary" style="font-size:0.8rem"><i class="fas fa-university"></i> Gerenciar Bancos</button>
+                    </div>
                 </div>
                 <div class="kpi-grid" style="margin-top: 15px;">
                     <div class="card chart-container" style="height: 250px;"><div class="canvas-wrapper"><canvas id="chartGastoStatus"></canvas></div></div>
@@ -236,7 +243,11 @@
                 </div>
                 <div class="card form-container" style="margin-top: 20px;">
                     <form id="form-gasto">
-                        <div class="form-row"><div class="form-group" style="flex:2"><label>Descrição</label><input type="text" id="gasto-nome" required></div><div class="form-group"><label>Valor (R$)</label><input type="number" id="gasto-valor" step="0.01" required></div></div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:2"><label>Descrição</label><input type="text" id="gasto-nome" required></div>
+                            <div class="form-group" style="flex:1"><label>Tipo / Categoria</label><select id="gasto-tipo" required><option value="">Selecione...</option></select></div>
+                            <div class="form-group" style="flex:1"><label>Valor (R$)</label><input type="number" id="gasto-valor" step="0.01" required></div>
+                        </div>
                         <div class="form-row"><div class="form-group"><label>Data Entrada</label><input type="date" id="gasto-data-entrada" required></div><div class="form-group"><label>Vencimento</label><input type="date" id="gasto-data-vencimento" required></div><div class="form-group"><label>Repetir (Meses)</label><input type="number" id="gasto-repetir" min="0" value="0" placeholder="+ Meses"></div><div class="form-group"><label>Status</label><select id="gasto-status" onchange="window.toggleCamposPagamento('gasto-status', 'container-pagamento-novo')"><option value="pendente">Pendente</option><option value="pago">Pago</option></select></div></div>
                         <div id="container-pagamento-novo" class="form-row hidden" style="background: #f0fdf4; padding: 10px; border-radius: 8px;"><div class="form-group"><label>Método</label><select id="gasto-metodo"></select></div><div class="form-group"><label>Banco</label><select id="gasto-banco"><option value="">Selecione...</option></select></div></div>
                         <button type="submit" class="btn-primary" style="width:100%; margin-top: 10px;">Registrar Gasto</button>
@@ -247,7 +258,7 @@
                 </div>
                 <div class="table-responsive">
                     <table id="tabela-gastos">
-                        <thead><tr><th style="width:30px"><input type="checkbox" id="select-all-gastos"></th><th class="sortable" onclick="window.ordenarTabela('gastos', 'dataEntrada')">Data <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('gastos', 'nome')">Descrição <i class="fas fa-sort"></i></th><th>Banco</th><th>Método</th><th>Vencimento</th><th class="sortable" onclick="window.ordenarTabela('gastos', 'valor')">Valor <i class="fas fa-sort"></i></th><th>Status</th><th>Ação</th></tr></thead>
+                        <thead><tr><th style="width:30px"><input type="checkbox" id="select-all-gastos"></th><th class="sortable" onclick="window.ordenarTabela('gastos', 'dataEntrada')">Data <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('gastos', 'nome')">Descrição <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('gastos', 'tipo')">Tipo <i class="fas fa-sort"></i></th><th>Banco</th><th>Método</th><th>Vencimento</th><th class="sortable" onclick="window.ordenarTabela('gastos', 'valor')">Valor <i class="fas fa-sort"></i></th><th>Status</th><th>Ação</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -433,15 +444,87 @@
             </div>
         </div>
     </div>
-    <div id="modal-gasto-edit" class="modal-overlay hidden"><div class="modal-box"><h3>Editar Despesa</h3><input type="hidden" id="edit-gasto-id"><div class="form-group"><label>Descrição</label><input type="text" id="edit-gasto-nome"></div><div class="form-group"><label>Valor (R$)</label><input type="number" id="edit-gasto-valor" step="0.01"></div><div style="display: flex; gap: 10px; margin-bottom: 15px;">
+    <div id="modal-gasto-edit" class="modal-overlay hidden">
+        <div class="modal-box">
+            <h3>Editar Despesa</h3>
+            <input type="hidden" id="edit-gasto-id">
+            
+            <div class="form-row">
+                <div class="form-group" style="flex:2"><label>Descrição</label><input type="text" id="edit-gasto-nome" required></div>
+                <div class="form-group" style="flex:1"><label>Tipo</label><select id="edit-gasto-tipo" required></select></div>
+                <div class="form-group" style="flex:1"><label>Valor (R$)</label><input type="number" id="edit-gasto-valor" step="0.01" required></div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <div class="form-group" style="flex: 1;"><label>Data Entrada</label><input type="date" id="edit-gasto-data"></div>
+                <div class="form-group" style="flex: 1;"><label>Vencimento</label><input type="date" id="edit-gasto-venc"></div>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Repetir (Meses)</label>
+                <input type="number" id="edit-gasto-repetir" min="0" value="0" placeholder="0" style="width: 100%;">
+            </div>
+            
+            <div class="form-group">
+                <label>Status</label>
+                <select id="edit-gasto-status" onchange="window.toggleCamposPagamento('edit-gasto-status', 'container-pagamento-edit')">
+                    <option value="pendente">Pendente</option>
+                    <option value="pago">Pago</option>
+                </select>
+            </div>
+            
+            <div id="container-pagamento-edit" class="hidden" style="background: #f0fdf4; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                <div class="form-group"><label>Método</label><select id="edit-gasto-metodo"></select></div>
+                <div class="form-group"><label>Banco</label><select id="edit-gasto-banco"><option value="">Selecione...</option></select></div>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-top:20px">
+                <button onclick="document.getElementById('modal-gasto-edit').classList.add('hidden')" style="background:#ccc; flex:1; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: #334155;">Cancelar</button>
+                <button onclick="window.salvarEdicaoGasto()" class="btn-primary" style="flex:1; padding: 12px; font-weight: bold;">Salvar</button>
+            </div>
+        </div>
+    </div>
     <div class="form-group" style="flex: 1;"><label>Data Entrada</label><input type="date" id="edit-gasto-data"></div><div class="form-group" style="flex: 1;"><label>Vencimento</label><input type="date" id="edit-gasto-venc"></div></div><div class="form-group" style="margin-bottom: 15px;"><label>Repetir</label><input type="number" id="edit-gasto-repetir" min="0" value="0" placeholder="0" style="width: 100%;"></div><div class="form-group"><label>Status</label><select id="edit-gasto-status" onchange="window.toggleCamposPagamento('edit-gasto-status', 'container-pagamento-edit')"><option value="pendente">Pendente</option><option value="pago">Pago</option></select></div><div id="container-pagamento-edit" class="hidden" style="background: #f0fdf4; padding: 10px; border-radius: 8px; margin-bottom: 15px;"><div class="form-group"><label>Método</label><select id="edit-gasto-metodo"></select></div><div class="form-group"><label>Banco</label><select id="edit-gasto-banco"><option value="">Selecione...</option></select></div></div><div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-gasto-edit').classList.add('hidden')" style="background:#ccc; flex:1">Cancelar</button><button onclick="window.salvarEdicaoGasto()" class="btn-primary" style="flex:1">Salvar</button></div></div></div>
     <div id="modal-bancos" class="modal-overlay hidden"><div class="modal-box"><h3>Gerenciar Bancos</h3><div style="display:flex; gap:10px; margin-bottom:15px"><input type="text" id="novo-banco-nome" placeholder="Nome do Banco"><button onclick="window.adicionarBanco()" class="btn-primary">+</button></div><ul id="lista-bancos" style="list-style:none; padding:0; max-height:200px; overflow-y:auto;"></ul><button onclick="document.getElementById('modal-bancos').classList.add('hidden')" style="width:100%; margin-top:15px; background:#ccc">Fechar</button></div></div>
+    <div id="modal-tipos-gasto" class="modal-overlay hidden"><div class="modal-box"><h3>Tipos de Gasto</h3><div style="display:flex; gap:10px; margin-bottom:15px"><input type="text" id="novo-tipo-gasto-nome" placeholder="Ex: Conta de Energia, Salário"><button onclick="window.adicionarTipoGasto()" class="btn-primary">+</button></div><ul id="lista-tipos-gasto" style="list-style:none; padding:0; max-height:200px; overflow-y:auto;"></ul><button onclick="document.getElementById('modal-tipos-gasto').classList.add('hidden')" style="width:100%; margin-top:15px; background:#ccc">Fechar</button></div></div>
     <div id="modal-editar" class="modal-overlay hidden"><div class="modal-box"><h3>Editar Venda</h3><input type="hidden" id="edit-id"><div class="form-group"><label>Valor</label><input type="number" id="edit-valor" step="0.01"></div><div class="form-group"><label>Método</label><select id="edit-metodo"></select></div><div style="display:flex; gap:10px; margin-top:20px"><button onclick="window.fecharModalEdicao()" style="background:#ccc; flex:1">Cancelar</button><button onclick="window.salvarEdicaoVenda()" class="btn-primary" style="flex:1">Salvar</button></div></div></div>
     <div id="modal-prod" class="modal-overlay hidden"><div class="modal-box"><h3>Editar Produto</h3><input type="hidden" id="edit-prod-id"><div class="form-group"><label>Nome</label><input type="text" id="edit-prod-nome"></div><div class="form-group"><label>Custo</label><input type="number" id="edit-prod-custo" step="0.01"></div><div class="form-group"><label>Venda</label><input type="number" id="edit-prod-venda" step="0.01"></div><div class="form-group"><label>Estoque Atual</label><input type="number" id="edit-prod-qtd" step="0.001"></div><div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-prod').classList.add('hidden')" style="background:#ccc; flex:1">Cancelar</button><button onclick="window.salvarEdicaoProduto()" class="btn-primary" style="flex:1">Salvar</button></div></div></div>
     <div id="modal-devedor" class="modal-overlay hidden"><div class="modal-box"><div style="display:flex; justify-content:space-between; align-items:center"><h3 id="titulo-devedor">Extrato</h3><button onclick="document.getElementById('modal-devedor').classList.add('hidden')" style="background:none; border:none; font-size:1.5rem">&times;</button></div><div class="table-responsive" style="max-height: 400px; overflow-y: auto; margin-top: 10px;"><table id="tabela-detalhes-devedor"><thead><tr><th>Data</th><th>Produto</th><th>Valor</th></tr></thead><tbody></tbody></table></div><div style="text-align: right; margin-top: 15px;"><button onclick="window.imprimirDebitosCliente()" class="btn-primary" style="background: #6366f1; padding: 10px 20px;"><i class="fas fa-print"></i> Imprimir Extrato</button><h3>Total: <span id="total-divida-modal" style="color: var(--danger)">R$ 0,00</span></h3></div></div></div>
     <div id="modal-backup" class="modal-overlay hidden"><div class="modal-box" style="text-align: center;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;"><h3>Gerenciar Backup</h3><button onclick="document.getElementById('modal-backup').classList.add('hidden')" class="btn-icon">&times;</button></div><p style="color: #64748b; margin-bottom: 20px;">Salve seus dados em um arquivo ou restaure de um arquivo antigo.</p><button onclick="window.exportarDadosBackup()" class="btn-primary" style="width: 100%; margin-bottom: 15px; padding: 15px;"><i class="fas fa-download"></i> Exportar Dados (Baixar Arquivo)</button><div style="border-top: 1px solid #e2e8f0; margin: 15px 0; padding-top: 15px;"><label for="input-import" class="btn-success" style="display: block; width: 100%; padding: 15px; cursor: pointer;"><i class="fas fa-upload"></i> Importar Dados (Carregar Arquivo)</label><input type="file" id="input-import" accept=".json" style="display: none;" onchange="window.importarDadosBackup(this)"></div></div></div>
     <div id="modal-func-edit" class="modal-overlay hidden">
     <div class="modal-box"><h3>Editar Funcionário</h3><input type="hidden" id="edit-func-id"><div class="form-group" style="margin-bottom: 15px;"><label>Nome</label><input type="text" id="edit-func-nome"></div><div class="form-group"><label>Perfil de Acesso</label><select id="edit-func-role"><option value="vendedor">Vendedor (Acesso Restrito)</option><option value="gerente">Gerente (Acesso Total)</option><option value="inativo">Inativo (Acesso Revogado)</option></select></div><div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-func-edit').classList.add('hidden')" style="background:#e2e8f0; color:#334155; padding:10px; border-radius:8px; border:none; flex:1">Cancelar</button><button onclick="window.salvarEdicaoFuncionario()" class="btn-primary" style="flex:1">Salvar</button></div></div></div>
+    <!-- NOVO MODAL: RELATÓRIO DE GASTOS -->
+    <div id="modal-relatorio-gastos" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width: 700px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+                <h3>Relatório Top Gastos (Mês Atual)</h3>
+                <button onclick="document.getElementById('modal-relatorio-gastos').classList.add('hidden')" class="btn-icon">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <div>
+                    <label style="font-size: 0.85rem;">Agrupar por:</label>
+                    <select id="relatorio-gastos-agrupamento" onchange="window.gerarGraficoRelatorioGastos()" style="padding: 6px; border-radius: 5px; font-size: 0.9rem;">
+                        <option value="tipo">Tipo / Categoria</option>
+                        <option value="nome">Descrição Exata</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem;">Mostrar:</label>
+                    <select id="relatorio-gastos-filtro" onchange="window.gerarGraficoRelatorioGastos()" style="padding: 6px; border-radius: 5px; font-size: 0.9rem;">
+                        <option value="5">Top 5</option>
+                        <option value="10" selected>Top 10</option>
+                        <option value="20">Top 20</option>
+                        <option value="9999">Todos</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="canvas-wrapper" style="height: 350px;">
+                <canvas id="chartRelatorioGastos"></canvas>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="app.js"></script>
 </body>
