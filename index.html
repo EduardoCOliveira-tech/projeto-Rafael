@@ -337,7 +337,25 @@
                     <div id="bulk-actions" class="hidden" style="background: #fee2e2; padding: 8px; border-radius: 8px;"><button onclick="window.excluirMassa()" class="btn-icon" style="color: #dc2626;">Apagar Selecionados</button></div>
                 </div>
                 <div style="margin-bottom: 10px;"><input type="text" id="busca-historico" placeholder="🔍 Filtrar..." onkeyup="window.filtrarHistorico()" style="padding: 10px; width: 100%;"></div>
-                <div class="table-responsive"><table id="tabela-historico"><thead><tr><th style="width:30px"><input type="checkbox" id="select-all"></th><th class="sortable" onclick="window.ordenarTabela('historico', 'data')">Data <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('historico', 'cliente')">Cliente <i class="fas fa-sort"></i></th><th class="sortable" onclick="window.ordenarTabela('historico', 'produtoNome')">Produto <i class="fas fa-sort"></i></th><th>Qtd</th><th class="sortable" onclick="window.ordenarTabela('historico', 'total')">Valor <i class="fas fa-sort"></i></th><th>Pagamento</th><th>Status</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+                <div class="table-responsive">
+                    <table id="tabela-historico">
+                        <thead>
+                            <tr>
+                                <th style="width:30px"><input type="checkbox" id="select-all"></th>
+                                <th class="sortable" onclick="window.ordenarTabela('historico', 'data')">Data <i class="fas fa-sort"></i></th>
+                                <th>Vendedor</th> <!-- COLUNA ADICIONADA AQUI -->
+                                <th class="sortable" onclick="window.ordenarTabela('historico', 'cliente')">Cliente <i class="fas fa-sort"></i></th>
+                                <th class="sortable" onclick="window.ordenarTabela('historico', 'produtoNome')">Produto <i class="fas fa-sort"></i></th>
+                                <th>Qtd</th>
+                                <th class="sortable" onclick="window.ordenarTabela('historico', 'total')">Valor <i class="fas fa-sort"></i></th>
+                                <th>Pagamento</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
                 <div id="paginacao-historico" class="hidden" style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 15px;">
                     <button onclick="window.mudarPaginaHistorico(-1)" id="btn-ant-hist" class="btn-primary" style="background: #64748b; padding: 5px 15px;" disabled><i class="fas fa-chevron-left"></i> Anterior</button>
                     <span id="info-paginacao" style="font-weight: bold; color: var(--text-main);">Pág. 1</span>
@@ -398,10 +416,12 @@
                 <div class="card form-container" style="margin-top: 15px;">
                     <form id="form-funcionario">
                         <div class="form-row">
-                            <div class="form-group" style="flex:2"><label>Nome</label><input type="text" id="func-nome" required></div>
-                            <div class="form-group" style="flex:2"><label>E-mail (Login)</label><input type="email" id="func-email" required></div>
+                            <div class="form-group" style="flex:2"><label>Nome Completo</label><input type="text" id="func-nome" required></div>
+                            <!-- CAMPO DE APELIDO ADICIONADO AQUI -->
+                            <div class="form-group" style="flex:1"><label>Apelido (Histórico)</label><input type="text" id="func-apelido" required placeholder="Ex: Rafa"></div>
                         </div>
                         <div class="form-row">
+                            <div class="form-group" style="flex:2"><label>E-mail (Login)</label><input type="email" id="func-email" required></div>
                             <div class="form-group" style="flex:1"><label>Senha (Mín. 6 letras)</label><input type="password" id="func-senha" required minlength="6"></div>
                             <div class="form-group" style="flex:1">
                                 <label>Perfil</label>
@@ -540,7 +560,27 @@
     <div id="modal-backup" class="modal-overlay hidden"><div class="modal-box" style="text-align: center;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;"><h3>Gerenciar Backup</h3><button onclick="document.getElementById('modal-backup').classList.add('hidden')" class="btn-icon">&times;</button></div><p style="color: #64748b; margin-bottom: 20px;">Salve seus dados em um arquivo ou restaure de um arquivo antigo.</p><button onclick="window.exportarDadosBackup()" class="btn-primary" style="width: 100%; margin-bottom: 15px; padding: 15px;"><i class="fas fa-download"></i> Exportar Dados (Baixar Arquivo)</button><div style="border-top: 1px solid #e2e8f0; margin: 15px 0; padding-top: 15px;"><label for="input-import" class="btn-success" style="display: block; width: 100%; padding: 15px; cursor: pointer;"><i class="fas fa-upload"></i> Importar Dados (Carregar Arquivo)</label><input type="file" id="input-import" accept=".json" style="display: none;" onchange="window.importarDadosBackup(this)"></div></div></div>
     
     <div id="modal-func-edit" class="modal-overlay hidden">
-        <div class="modal-box"><h3>Editar Funcionário</h3><input type="hidden" id="edit-func-id"><div class="form-group" style="margin-bottom: 15px;"><label>Nome</label><input type="text" id="edit-func-nome"></div><div class="form-group"><label>Perfil de Acesso</label><select id="edit-func-role"><option value="vendedor">Vendedor (Acesso Restrito)</option><option value="gerente">Gerente (Acesso Total)</option><option value="inativo">Inativo (Acesso Revogado)</option></select></div><div style="display:flex; gap:10px; margin-top:20px"><button onclick="document.getElementById('modal-func-edit').classList.add('hidden')" style="background:#e2e8f0; color:#334155; padding:10px; border-radius:8px; border:none; flex:1">Cancelar</button><button onclick="window.salvarEdicaoFuncionario()" class="btn-primary" style="flex:1">Salvar</button></div></div>
+        <div class="modal-box">
+            <h3>Editar Funcionário</h3>
+            <input type="hidden" id="edit-func-id">
+            <div class="form-row">
+                <div class="form-group" style="flex:2"><label>Nome</label><input type="text" id="edit-func-nome"></div>
+                <!-- CAMPO APELIDO ADICIONADO NA EDIÇÃO -->
+                <div class="form-group" style="flex:1"><label>Apelido</label><input type="text" id="edit-func-apelido"></div>
+            </div>
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Perfil de Acesso</label>
+                <select id="edit-func-role">
+                    <option value="vendedor">Vendedor (Acesso Restrito)</option>
+                    <option value="gerente">Gerente (Acesso Total)</option>
+                    <option value="inativo">Inativo (Acesso Revogado)</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px">
+                <button onclick="document.getElementById('modal-func-edit').classList.add('hidden')" style="background:#e2e8f0; color:#334155; padding:10px; border-radius:8px; border:none; flex:1">Cancelar</button>
+                <button onclick="window.salvarEdicaoFuncionario()" class="btn-primary" style="flex:1">Salvar</button>
+            </div>
+        </div>
     </div>
     
     <!-- NOVO MODAL: RELATÓRIO DE GASTOS -->

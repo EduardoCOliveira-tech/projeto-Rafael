@@ -5,7 +5,7 @@ import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit
        from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
 // Variável para sabermos quem está usando o sistema
-let usuarioAtual = { email: '', role: 'gerente' };
+let usuarioAtual = { email: '', role: 'gerente', apelido: '' };
 
 // ============================================================
 // 1. CONFIGURAÇÃO
@@ -409,6 +409,9 @@ async function carregarHistorico() {
 }
 window.carregarHistorico = carregarHistorico;
 
+// ==========================================================
+// 3. Substituir APENAS a função `renderizarTabelaHistorico`
+// ==========================================================
 function renderizarTabelaHistorico() {
     const tbody = document.querySelector('#tabela-historico tbody');
     if(!tbody) return;
@@ -423,19 +426,19 @@ function renderizarTabelaHistorico() {
         let rowStyle = '';
         if(v.total < 0 && !v.pago) { b = 'badge-success'; st = 'PAGTO DÍVIDA'; rowStyle = 'style="background:#f0fdf4"'; }
         
-        // --- LÓGICA DE PERMISSÃO (SÓ APAGA SUAS VENDAS DO DIA) ---
         const hojeDataStr = new Date().toLocaleDateString('pt-BR');
         const vendaDataStr = dataObj ? dataObj.toLocaleDateString('pt-BR') : '';
         let podeEditar = true;
         
         if (usuarioAtual.role === 'vendedor') {
-            podeEditar = (v.vendedor === usuarioAtual.email && vendaDataStr === hojeDataStr);
+            podeEditar = (v.vendedorEmail === usuarioAtual.email && vendaDataStr === hojeDataStr);
         }
         
         let checkboxHtml = podeEditar ? `<input type="checkbox" class="sale-checkbox" value="${v.id}" data-pid="${v.produtoId}" data-qtd="${v.qtd}">` : `<i class="fas fa-lock" style="color:#cbd5e1" title="Restrito"></i>`;
         let btnEditHtml = podeEditar ? `<button onclick="window.abrirEdicao('${v.id}','${v.total}','${v.metodo}')" class="btn-icon btn-edit"><i class="fas fa-edit"></i></button>` : '';
 
-        htmlBuffer += `<tr ${rowStyle}><td style="text-align:center">${checkboxHtml}</td><td>${dataF}</td><td>${v.cliente}</td><td>${v.produtoNome}</td><td>${v.qtd||1}</td><td style="${v.total<0?'color:green;font-weight:bold':''}">${v.total<0?'R$ '+Math.abs(v.total).toFixed(2)+' (Abatido)':'R$ '+v.total.toFixed(2)}</td><td>${pg}</td><td><span class="badge ${b}">${st}</span></td><td>${btnEditHtml}</td></tr>`;
+        // NOVIDADE: v.vendedorNome adicionado após a data
+        htmlBuffer += `<tr ${rowStyle}><td style="text-align:center">${checkboxHtml}</td><td>${dataF}</td><td><span class="badge" style="background:#e2e8f0; color:#475569; font-size:0.7rem;">${v.vendedorNome || 'Antigo'}</span></td><td>${v.cliente}</td><td>${v.produtoNome}</td><td>${v.qtd||1}</td><td style="${v.total<0?'color:green;font-weight:bold':''}">${v.total<0?'R$ '+Math.abs(v.total).toFixed(2)+' (Abatido)':'R$ '+v.total.toFixed(2)}</td><td>${pg}</td><td><span class="badge ${b}">${st}</span></td><td>${btnEditHtml}</td></tr>`;
     });
     
     tbody.innerHTML = htmlBuffer;
@@ -934,12 +937,14 @@ function iniciarTimerLogoff() {
     window.onscroll = resetarTimer;
     resetarTimer();
 }
-
-let primeiraVerificacao = true; // Variável para saber se acabou de abrir a página
+// ==========================================================
+// 2. Substituir o bloco "onAuthStateChanged" inteiro (por volta da linha 400-500)
+// ==========================================================
+let primeiraVerificacao = true; 
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
-        primeiraVerificacao = false; // A partir daqui, ele já está logado
+        primeiraVerificacao = false; 
         
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('app-screen').classList.remove('hidden');
@@ -947,12 +952,20 @@ onAuthStateChanged(auth, async (user) => {
         
         usuarioAtual.email = user.email;
         usuarioAtual.role = 'inativo'; 
+        usuarioAtual.apelido = 'Vendedor'; // Padrão caso dê erro
         
         try {
             const q = query(collection(db, 'loja_usuarios'), where("email", "==", user.email));
             const snap = await getDocs(q);
             if (!snap.empty) {
-                usuarioAtual.role = snap.docs[0].data().role;
+                const userData = snap.docs[0].data();
+                usuarioAtual.role = userData.role;
+                // NOVIDADE: Salva o apelido (ou pega o 1º nome se não tiver apelido)
+                usuarioAtual.apelido = userData.apelido || userData.nome.split(' ')[0] || 'Vendedor';
+            } else {
+                // Se for o dono acessando sem estar na tabela ainda
+                usuarioAtual.role = 'gerente';
+                usuarioAtual.apelido = 'Admin';
             }
             
             if (usuarioAtual.role === 'inativo') {
@@ -963,27 +976,19 @@ onAuthStateChanged(auth, async (user) => {
 
             if (usuarioAtual.role === 'vendedor') {
                 document.body.classList.add('perfil-vendedor');
-                // Força o sistema a "clicar" na aba de Nova Venda para tirar o Dashboard da tela
-                setTimeout(() => {
-                    document.querySelector('li[data-target="vendas"]')?.click();
-                }, 50);
+                setTimeout(() => document.querySelector('li[data-target="vendas"]')?.click(), 50);
             } else {
                 document.body.classList.remove('perfil-vendedor');
-                // Força o sistema a "clicar" no Dashboard para garantir a tela certa para o Gerente
-                setTimeout(() => {
-                    document.querySelector('li[data-target="dashboard"]')?.click();
-                }, 50);
+                setTimeout(() => document.querySelector('li[data-target="dashboard"]')?.click(), 50);
             }
         } catch (e) { console.error("Erro ao verificar perfil:", e); }
 
         iniciarApp();
         if(typeof iniciarTimerLogoff === 'function') iniciarTimerLogoff();
     } else {
-        // SE NÃO É A PRIMEIRA VERIFICAÇÃO, SIGNIFICA QUE ELE ACABOU DE CLICAR EM "SAIR"
         if (!primeiraVerificacao) {
-            window.location.reload(); // Força o recarregamento (limpa memória, carrinho e tabelas)
+            window.location.reload(); 
         } else {
-            // Se for só a página abrindo pela primeira vez, só mostra a tela de login normalmente
             primeiraVerificacao = false;
             document.getElementById('login-screen').classList.remove('hidden');
             document.getElementById('app-screen').classList.add('hidden');
@@ -1143,140 +1148,89 @@ window.finalizarVendaCarrinho = async () => {
     let pagamentosFinais = [...pagamentosVenda];
     let metodoString = "";
 
-    // LÓGICA DE PAGAMENTO
     if (pagamentosFinais.length === 0) {
-        // Modo Simples
         const metodoSelect = document.getElementById('venda-metodo');
         const metodoNome = metodoSelect.options[metodoSelect.selectedIndex].text;
         const metodoVal = metodoSelect.value;
-        
         const inputVal = document.getElementById('valor-pagamento-parcial');
         let valorDigitado = parseFloat(inputVal.value);
         if (!isNaN(valorDigitado) && valorDigitado > totalCarrinho) {
             const troco = valorDigitado - totalCarrinho;
             alert(`ATENÇÃO: Troco a devolver ao cliente R$ ${troco.toFixed(2)}`);
         }
-
         pagamentosFinais.push({ metodo: metodoNome, metodoValue: metodoVal, valor: totalCarrinho });
         metodoString = metodoVal; 
     } else {
-        // Modo Múltiplo
         const totalPago = pagamentosFinais.reduce((acc, pg) => acc + pg.valor, 0);
-        
-        if (Math.abs(totalPago - totalCarrinho) > 0.05) {
-            return window.mostrarAlerta("Erro", `Pagamento diverge do total! Pago: ${totalPago.toFixed(2)} | Total: ${totalCarrinho.toFixed(2)}`, "error");
-        }
-        
+        if (Math.abs(totalPago - totalCarrinho) > 0.05) return window.mostrarAlerta("Erro", `Pagamento diverge do total! Pago: ${totalPago.toFixed(2)} | Total: ${totalCarrinho.toFixed(2)}`, "error");
         metodoString = pagamentosFinais.map(p => p.metodo).join(" + ");
     }
 
     const cliente = document.getElementById('venda-cliente').value;
     const dataVenda = document.getElementById('venda-data').value;
     
-    // CALCULA QUANTO É FIADO E QUANTO FOI PAGO AGORA
-    const totalFiado = pagamentosFinais
-        .filter(p => p.metodoValue === 'aver')
-        .reduce((acc, p) => acc + p.valor, 0);
-        
+    const totalFiado = pagamentosFinais.filter(p => p.metodoValue === 'aver').reduce((acc, p) => acc + p.valor, 0);
     const totalPagoAgora = totalCarrinho - totalFiado;
     const temFiado = totalFiado > 0.01;
 
-    if(temFiado && (!cliente || cliente === 'Consumidor Final')) 
-        return window.mostrarAlerta("Erro", "Fiado exige cliente identificado!", "error");
+    if(temFiado && (!cliente || cliente === 'Consumidor Final')) return window.mostrarAlerta("Erro", "Fiado exige cliente identificado!", "error");
 
-    
     window.mostrarLoading(true);
     const batch = writeBatch(db); 
     
     let dataBase = new Date(dataVenda + 'T00:00:00');
     const agora = new Date();
-    dataBase.setHours(agora.getHours());
-    dataBase.setMinutes(agora.getMinutes());
-    dataBase.setSeconds(agora.getSeconds());
-    
+    dataBase.setHours(agora.getHours()); dataBase.setMinutes(agora.getMinutes()); dataBase.setSeconds(agora.getSeconds());
     const dataFinal = dataBase;
 
     const itensParaImpressao = [...carrinho]; 
     const idVendaGeral = doc(collection(db, COLECAO_VENDAS)).id;
 
     try {
-        // 1. SALVA OS PRODUTOS
-        // Se tem fiado, salvamos como NÃO PAGO inicialmente para registrar o débito total
         for (const item of carrinho) {
             const vendaRef = doc(collection(db, COLECAO_VENDAS));
-            
             batch.set(vendaRef, { 
-                idVendaAgrupada: idVendaGeral,
-                produtoId: item.id, 
-                produtoNome: item.nome, 
-                qtd: item.qtd, 
-                total: item.total, 
-                custo: (item.custo||0)*item.qtd, 
-                metodo: metodoString, 
-                detalhesPagamento: pagamentosFinais, 
-                cliente: cliente, 
-                pago: !temFiado, // Se tem fiado, marca false (pendente)
-                data: Timestamp.fromDate(dataFinal) 
+                idVendaAgrupada: idVendaGeral, produtoId: item.id, produtoNome: item.nome, qtd: item.qtd, 
+                total: item.total, custo: (item.custo||0)*item.qtd, metodo: metodoString, 
+                detalhesPagamento: pagamentosFinais, cliente: cliente, pago: !temFiado, data: Timestamp.fromDate(dataFinal),
+                // NOVIDADE: Adiciona quem fez a venda
+                vendedorEmail: usuarioAtual.email, vendedorNome: usuarioAtual.apelido 
             });
-            
             const prodRef = doc(db, COLECAO_PRODUTOS, item.id);
             batch.update(prodRef, { qtd: increment(-item.qtd) });
         }
 
-        // 2. SE HOUVE PAGAMENTO PARCIAL (MISTO), CRIA O ABATIMENTO AUTOMÁTICO
-        // Isso reduz a dívida do cliente imediatamente
         if (temFiado && totalPagoAgora > 0.01) {
             const ajusteRef = doc(collection(db, COLECAO_VENDAS));
-            
-            // Filtra os métodos que não são fiado para registrar como foi pago essa parte
-            const metodosPagos = pagamentosFinais
-                .filter(p => p.metodoValue !== 'aver')
-                .map(p => p.metodo).join(" + ");
-
+            const metodosPagos = pagamentosFinais.filter(p => p.metodoValue !== 'aver').map(p => p.metodo).join(" + ");
             batch.set(ajusteRef, {
-                idVendaAgrupada: idVendaGeral,
-                produtoId: 'ajuste_auto',
-                // O nome DEVE ser exatamente este para o Dashboard ignorar na soma de vendas totais
-                // mas a lista de devedores usar para subtrair a dívida
-                produtoNome: "PAGAMENTO DÍVIDA", 
-                qtd: 1,
-                total: -totalPagoAgora, // VALOR NEGATIVO PARA ABATER
-                custo: 0,
-                metodo: metodosPagos,
-                cliente: cliente,
-                pago: false, // Mantemos false para entrar no cálculo de saldo do devedor
-                data: Timestamp.fromDate(dataFinal)
+                idVendaAgrupada: idVendaGeral, produtoId: 'ajuste_auto', produtoNome: "PAGAMENTO DÍVIDA", 
+                qtd: 1, total: -totalPagoAgora, custo: 0, metodo: metodosPagos, cliente: cliente, 
+                pago: false, data: Timestamp.fromDate(dataFinal),
+                // NOVIDADE: Adiciona quem fez a baixa
+                vendedorEmail: usuarioAtual.email, vendedorNome: usuarioAtual.apelido
             });
         }
 
         await batch.commit();
-        
         window.mostrarLoading(false); 
         
-        // Novo modal elegante para perguntar da impressão!
         window.mostrarConfirmacao("Venda Finalizada!", "A venda foi salva com sucesso. Deseja imprimir a Nota de Venda agora?", () => {
             window.imprimirNota({ id: idVendaGeral, cliente: cliente, data: dataFinal, metodo: metodoString }, itensParaImpressao);
         });
 
-        carrinho = []; 
-        pagamentosVenda = []; 
-        window.atualizarInfoPagamento(); 
-        renderizarCarrinho(); 
-        carregarEstoque();
+        carrinho = []; pagamentosVenda = []; window.atualizarInfoPagamento(); renderizarCarrinho(); carregarEstoque();
 
-        // --- NOVA LÓGICA: VOLTAR OS CAMPOS PARA O PADRÃO ---
-        document.getElementById('venda-cliente').value = 'Consumidor Final'; // Volta pro cliente padrão
-        document.getElementById('venda-data').valueAsDate = new Date(); // Volta para o dia de hoje
+        document.getElementById('venda-cliente').value = 'Consumidor Final'; 
+        document.getElementById('venda-data').valueAsDate = new Date(); 
         const selectMetodo = document.getElementById('venda-metodo');
-        if (selectMetodo) selectMetodo.selectedIndex = 0; // Volta para o primeiro método (Ex: Dinheiro)
+        if (selectMetodo) selectMetodo.selectedIndex = 0; 
         const inputParcial = document.getElementById('valor-pagamento-parcial');
-        if (inputParcial) inputParcial.value = ''; // Limpa a caixa de valor pago
-        document.getElementById('venda-produto').focus(); // Já deixa o mouse piscando no produto para a próxima venda!
+        if (inputParcial) inputParcial.value = ''; 
+        document.getElementById('venda-produto').focus(); 
 
     } catch (e) { 
-        console.error(e); 
-        window.mostrarLoading(false); 
-        window.mostrarAlerta("Erro", "Falha ao finalizar.", "error"); 
+        console.error(e); window.mostrarLoading(false); window.mostrarAlerta("Erro", "Falha ao finalizar.", "error"); 
     }
 };
 
@@ -1592,7 +1546,28 @@ window.imprimirDebitosCliente = async () => {
         window.mostrarLoading(false);
     }
 };
-window.salvarAbatimento = async () => { const n = document.getElementById('abatimento-cliente').value; const v = parseFloat(document.getElementById('abatimento-valor').value); const m = document.getElementById('abatimento-metodo').value; if (!v || v <= 0) return window.mostrarAlerta("Erro", "Valor inválido.", "error"); window.mostrarLoading(true); try { await addDoc(collection(db, COLECAO_VENDAS), { cliente: n, produtoNome: "PAGAMENTO DÍVIDA", total: -v, metodo: m, pago: false, qtd: 1, data: Timestamp.now() }); const q = query(collection(db, COLECAO_VENDAS), where("cliente", "==", n), where("pago", "==", false)); const snap = await getDocs(q); let saldo = 0; const list = []; snap.forEach(d => { saldo += d.data().total; list.push(d.ref); }); if (saldo <= 0.01) { const b = writeBatch(db); list.forEach(r => b.update(r, { pago: true })); await b.commit(); window.mostrarAlerta("Sucesso", `Dívida de ${n} quitada!`, "success"); } else { window.mostrarAlerta("Sucesso", `Pago R$ ${v}. Resta R$ ${saldo.toFixed(2)}`, "success"); } document.getElementById('modal-abatimento').classList.add('hidden'); window.carregarDevedores(); } catch (e) { console.error(e); } finally { window.mostrarLoading(false); } };
+window.salvarAbatimento = async () => { 
+    const n = document.getElementById('abatimento-cliente').value; 
+    const v = parseFloat(document.getElementById('abatimento-valor').value); 
+    const m = document.getElementById('abatimento-metodo').value; 
+    if (!v || v <= 0) return window.mostrarAlerta("Erro", "Valor inválido.", "error"); 
+    window.mostrarLoading(true); 
+    try { 
+        await addDoc(collection(db, COLECAO_VENDAS), { 
+            cliente: n, produtoNome: "PAGAMENTO DÍVIDA", total: -v, metodo: m, pago: false, qtd: 1, data: Timestamp.now(),
+            vendedorEmail: usuarioAtual.email, vendedorNome: usuarioAtual.apelido // <-- NOVIDADE
+        }); 
+        const q = query(collection(db, COLECAO_VENDAS), where("cliente", "==", n), where("pago", "==", false)); 
+        const snap = await getDocs(q); 
+        let saldo = 0; const list = []; 
+        snap.forEach(d => { saldo += d.data().total; list.push(d.ref); }); 
+        if (saldo <= 0.01) { 
+            const b = writeBatch(db); list.forEach(r => b.update(r, { pago: true })); await b.commit(); 
+            window.mostrarAlerta("Sucesso", `Dívida de ${n} quitada!`, "success"); 
+        } else { window.mostrarAlerta("Sucesso", `Pago R$ ${v}. Resta R$ ${saldo.toFixed(2)}`, "success"); } 
+        document.getElementById('modal-abatimento').classList.add('hidden'); window.carregarDevedores(); 
+    } catch (e) { console.error(e); } finally { window.mostrarLoading(false); } 
+};
 window.filtrarEstoque = () => { const t = document.getElementById('busca-estoque').value.toLowerCase(); document.querySelectorAll('#tabela-estoque tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
 window.filtrarHistorico = () => { const t = document.getElementById('busca-historico').value.toLowerCase(); document.querySelectorAll('#tabela-historico tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
 window.filtrarClientes = () => { const t = document.getElementById('busca-clientes').value.toLowerCase(); document.querySelectorAll('#tabela-clientes tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none'); };
@@ -2214,145 +2189,87 @@ window.carregarFuncionarios = async () => {
     if(usuarioAtual.role !== 'gerente') return; 
     const snap = await getDocs(collection(db, 'loja_usuarios'));
     const tb = document.querySelector('#tabela-funcionarios tbody');
-    if(!tb) return;
-    let html = '';
+    if(!tb) return; let html = '';
     
     snap.forEach(d => {
         const u = d.data();
         let statusRole = u.role === 'inativo' ? '<span class="badge badge-danger">REVOGADO</span>' : `<span class="badge badge-success">${u.role.toUpperCase()}</span>`;
-            
-        html += `<tr>
-            <td style="text-align:center"><input type="checkbox" class="func-checkbox" value="${d.id}"></td>
-            <td>${u.nome}</td><td>${u.email}</td><td>${statusRole}</td>
-            <td>
-                <button onclick="window.abrirEditarFuncionario('${d.id}', '${u.nome}', '${u.role}')" class="btn-icon btn-edit" title="Editar"><i class="fas fa-edit"></i></button>
-                <button onclick="window.excluirFuncionario('${d.id}', '${u.email}')" class="btn-icon btn-delete" title="Excluir Permanente"><i class="fas fa-trash"></i></button>
-            </td>
-        </tr>`;
+        // NOVIDADE: O Apelido aparece logo abaixo do Nome Completo
+        html += `<tr><td style="text-align:center"><input type="checkbox" class="func-checkbox" value="${d.id}"></td><td>${u.nome} <br><small style="color:var(--text-muted)">(${u.apelido || 'Sem apelido'})</small></td><td>${u.email}</td><td>${statusRole}</td><td><button onclick="window.abrirEditarFuncionario('${d.id}', '${u.nome}', '${u.apelido || ''}', '${u.role}')" class="btn-icon btn-edit" title="Editar"><i class="fas fa-edit"></i></button><button onclick="window.excluirFuncionario('${d.id}', '${u.email}')" class="btn-icon btn-delete" title="Excluir Permanente"><i class="fas fa-trash"></i></button></td></tr>`;
     });
     tb.innerHTML = html;
     configurarCheckboxes('select-all-func', 'func-checkbox', 'bulk-actions-funcionarios', null);
 };
 
-// Nova Função de apagar Funcionários em Massa
 window.excluirMassaFuncionarios = async () => { 
     const c = document.querySelectorAll('.func-checkbox:checked'); 
     if(c.length===0) return; 
-    
     window.mostrarConfirmacao("Apagar Funcionários?", `Você está prestes a excluir permanentemente ${c.length} contas de acesso. Continuar?`, async () => { 
         window.mostrarLoading(true); 
-        for(const x of c) {
-            await deleteDoc(doc(db, 'loja_usuarios', x.value)); 
-        }
-        window.mostrarLoading(false); 
-        document.getElementById('select-all-func').checked = false; 
-        document.getElementById('bulk-actions-funcionarios').classList.add('hidden'); 
-        window.mostrarAlerta("Sucesso", "Funcionários removidos com sucesso!", "success");
-        window.carregarFuncionarios(); 
+        for(const x of c) { await deleteDoc(doc(db, 'loja_usuarios', x.value)); }
+        window.mostrarLoading(false); document.getElementById('select-all-func').checked = false; document.getElementById('bulk-actions-funcionarios').classList.add('hidden'); window.mostrarAlerta("Sucesso", "Funcionários removidos com sucesso!", "success"); window.carregarFuncionarios(); 
     }); 
 };
 
 document.getElementById('form-funcionario')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const nome = document.getElementById('func-nome').value;
+    const apelido = document.getElementById('func-apelido').value;
     const email = document.getElementById('func-email').value;
     const senha = document.getElementById('func-senha').value;
     const role = document.getElementById('func-role').value;
     
     window.mostrarLoading(true);
     try {
-        // 1. Verifica se o e-mail já está na tabela de permissões (loja_usuarios)
         const q = query(collection(db, 'loja_usuarios'), where("email", "==", email));
         const snap = await getDocs(q);
-        
-        if (!snap.empty) {
-            window.mostrarLoading(false);
-            return window.mostrarAlerta("Aviso", "Este e-mail já está na lista de funcionários!", "warning");
-        }
+        if (!snap.empty) { window.mostrarLoading(false); return window.mostrarAlerta("Aviso", "Este e-mail já está na lista de funcionários!", "warning"); }
 
-        // 2. Tenta criar a conta no Autenticador do Firebase
         try {
             await createUserWithEmailAndPassword(authSecundario, email, senha);
             await signOut(authSecundario);
         } catch (authErr) {
-            // Se o e-mail já existir no sistema (caso do Gerente), não tem problema! 
-            // O sistema engole esse erro e passa para a próxima etapa.
-            if (authErr.code === 'auth/email-already-in-use') {
-                console.log("Conta já existe no Auth. Vinculando à tabela de permissões...");
-            } else {
-                throw authErr; // Se for outro erro (como senha fraca), joga para o catch principal
-            }
+            if (authErr.code === 'auth/email-already-in-use') { console.log("Conta vinculando..."); } else { throw authErr; }
         }
         
-        // 3. Salva o perfil no banco de dados (Firestore)
-        await addDoc(collection(db, 'loja_usuarios'), { nome, email, role });
+        await addDoc(collection(db, 'loja_usuarios'), { 
+            nome, 
+            apelido, // <-- NOVIDADE
+            email, 
+            role 
+        });
         
         window.mostrarAlerta("Sucesso", "Funcionário salvo/vinculado com sucesso!", "success");
-        document.getElementById('form-funcionario').reset();
-        window.carregarFuncionarios();
-        
-    } catch(err) {
-        console.error("Erro real do Firebase:", err); 
-        
-        let msgErro = "Erro ao criar funcionário.";
-        
-        if (err.code === 'auth/weak-password') {
-            msgErro = "A senha é muito fraca (deve ter no mínimo 6 caracteres).";
-        } else if (err.code === 'auth/network-request-failed') {
-            msgErro = "Falha de rede. Verifique sua conexão com a internet ou bloqueios de VPN/Antivírus.";
-        } else {
-            msgErro += " Detalhe: " + err.message;
-        }
-
-        window.mostrarAlerta("Erro", msgErro, "error");
-    } finally {
-        window.mostrarLoading(false);
-    }
+        document.getElementById('form-funcionario').reset(); window.carregarFuncionarios();
+    } catch(err) { console.error("Erro Firebase:", err); window.mostrarAlerta("Erro", "Erro ao criar funcionário.", "error"); } finally { window.mostrarLoading(false); }
 });
 
-// Abre a janela para editar nome e perfil
-window.abrirEditarFuncionario = (id, nome, role) => {
-    document.getElementById('edit-func-id').value = id;
+window.abrirEditarFuncionario = (id, nome, apelido, role) => {
+    document.getElementById('edit-func-id').value = id; 
     document.getElementById('edit-func-nome').value = nome;
+    document.getElementById('edit-func-apelido').value = apelido;
     document.getElementById('edit-func-role').value = role;
     document.getElementById('modal-func-edit').classList.remove('hidden');
 };
 
-// Salva a edição
 window.salvarEdicaoFuncionario = async () => {
     const id = document.getElementById('edit-func-id').value;
     const nome = document.getElementById('edit-func-nome').value;
+    const apelido = document.getElementById('edit-func-apelido').value;
     const role = document.getElementById('edit-func-role').value;
-    
     window.mostrarLoading(true);
     try {
-        await updateDoc(doc(db, 'loja_usuarios', id), { nome, role });
+        await updateDoc(doc(db, 'loja_usuarios', id), { nome, apelido, role });
         window.mostrarAlerta("Sucesso", "Funcionário atualizado!", "success");
-        document.getElementById('modal-func-edit').classList.add('hidden');
-        window.carregarFuncionarios();
-    } catch(e) {
-        window.mostrarAlerta("Erro", "Falha ao atualizar.", "error");
-    } finally {
-        window.mostrarLoading(false);
-    }
+        document.getElementById('modal-func-edit').classList.add('hidden'); window.carregarFuncionarios();
+    } catch(e) { window.mostrarAlerta("Erro", "Falha ao atualizar.", "error"); } finally { window.mostrarLoading(false); }
 };
 
-// Apaga o funcionário do banco de dados
 window.excluirFuncionario = (id, email) => {
-    if (email === usuarioAtual.email) {
-        return window.mostrarAlerta("Atenção", "Você não pode excluir sua própria conta por aqui!", "warning");
-    }
-    window.mostrarConfirmacao("Apagar Funcionário?", "O funcionário será apagado do sistema e perderá o acesso.", async () => {
+    if (email === usuarioAtual.email) return window.mostrarAlerta("Atenção", "Você não pode excluir sua própria conta por aqui!", "warning");
+    window.mostrarConfirmacao("Apagar Funcionário?", "O funcionário será apagado e perderá o acesso.", async () => {
         window.mostrarLoading(true);
-        try {
-            await deleteDoc(doc(db, 'loja_usuarios', id));
-            window.mostrarAlerta("Sucesso", "Funcionário excluído com sucesso!", "success");
-            window.carregarFuncionarios();
-        } catch(e) {
-            window.mostrarAlerta("Erro", "Falha ao excluir.", "error");
-        } finally {
-            window.mostrarLoading(false);
-        }
+        try { await deleteDoc(doc(db, 'loja_usuarios', id)); window.mostrarAlerta("Sucesso", "Funcionário excluído com sucesso!", "success"); window.carregarFuncionarios(); } catch(e) { window.mostrarAlerta("Erro", "Falha ao excluir.", "error"); } finally { window.mostrarLoading(false); }
     });
 };
 
