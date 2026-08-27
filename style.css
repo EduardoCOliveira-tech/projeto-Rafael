@@ -264,7 +264,20 @@ td button { margin-right: 8px; vertical-align: middle; }
 input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); border-radius: 4px; }
 
 /* Badges (Etiquetas) */
-.badge { padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; display: inline-block; letter-spacing: 0.5px; }
+.badge { 
+    padding: 6px 12px; 
+    border-radius: 12px; 
+    font-size: 0.75rem; 
+    font-weight: 700; 
+    text-transform: uppercase; 
+    display: inline-block; /* Funciona melhor em tabelas que o inline-flex */
+    text-align: center;
+    letter-spacing: 0.5px; 
+    white-space: normal; /* Permite quebrar frases grandes */
+    word-break: normal; /* MÁGICA: Impede terminantemente que as palavras sejam fatiadas no meio das letras */
+    line-height: 1.2; 
+    min-width: 75px; /* Impede que a tabela esmague a etiqueta demais */
+}
 .badge-success { background: rgba(16, 185, 129, 0.15); color: #059669; }
 .badge-warning { background: rgba(245, 158, 11, 0.15); color: #D97706; }
 .badge-danger { background: rgba(239, 68, 68, 0.15); color: #DC2626; }
